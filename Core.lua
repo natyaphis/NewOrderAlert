@@ -1,28 +1,18 @@
--- NewOrderAlert - Core
--- Main event handling, detection, and notification logic
-
 local addonName, addon = ...
 local ADDON_TITLE = "NewOrderAlert"
 local SAVED_VARIABLES_NAME = "NewOrderAlertDB"
-
--- ============================================================================
--- Constants and Defaults
--- ============================================================================
 
 local THROTTLE_SECONDS = 3
 local LOCALE = GetLocale and GetLocale() or "enUS"
 local ORDER_MESSAGE_PATTERNS = {
     enUS = {
         personal = { "Crafting Order", "received", "Personal" },
-        guild = { "Crafting Order", "received", "Guild" },
     },
     zhCN = {
         personal = { "制作订单", "个人" },
-        guild = { "制作订单", "公会" },
     },
     zhTW = {
         personal = { "製作訂單", "個人" },
-        guild = { "製作訂單", "公會" },
     },
 }
 
@@ -31,7 +21,6 @@ local DEFAULTS = {
     soundIndex = 1,
     soundChannel = "Master",
     playInBackground = true,
-
     textEnabled = true,
     textScale = 1.0,
     textColor = { r = 1, g = 1, b = 0 },
@@ -40,22 +29,13 @@ local DEFAULTS = {
     displayDuration = 3,
     orderMessage = "New Personal Crafting Order!",
     chatEnabled = false,
-
     suppressInCombat = true,
     suppressInInstance = true,
 }
 
--- ============================================================================
--- Local Variables
--- ============================================================================
-
 local db
 local lastNotificationTime = 0
 local notificationFrame
-
--- ============================================================================
--- Helper Functions
--- ============================================================================
 
 local function MessageContainsAll(message, parts)
     if type(message) ~= "string" or type(parts) ~= "table" then
@@ -71,27 +51,18 @@ local function MessageContainsAll(message, parts)
     return true
 end
 
-local function GetOrderMessageType(message)
+local function IsPersonalOrderMessage(message)
     local patterns = ORDER_MESSAGE_PATTERNS[LOCALE] or ORDER_MESSAGE_PATTERNS.enUS
 
     if patterns and MessageContainsAll(message, patterns.personal) then
-        return "personal"
+        return true
     end
 
-    if patterns and MessageContainsAll(message, patterns.guild) then
-        return "guild"
+    if LOCALE ~= "enUS" and MessageContainsAll(message, ORDER_MESSAGE_PATTERNS.enUS.personal) then
+        return true
     end
 
-    if LOCALE ~= "enUS" then
-        if MessageContainsAll(message, ORDER_MESSAGE_PATTERNS.enUS.personal) then
-            return "personal"
-        end
-        if MessageContainsAll(message, ORDER_MESSAGE_PATTERNS.enUS.guild) then
-            return "guild"
-        end
-    end
-
-    return nil
+    return false
 end
 
 local function CanNotify()
@@ -119,37 +90,37 @@ local function IsSuppressed()
 end
 
 local function PlayNotificationSound()
-    if not db.soundEnabled then return end
+    if not db.soundEnabled then
+        return
+    end
 
     local soundData = addon.SOUND_LIST[db.soundIndex]
-    if soundData then
-        if soundData.soundKitID then
-            -- Use PlaySound for SoundKitIDs
-            PlaySound(soundData.soundKitID, db.soundChannel)
-        elseif soundData.fileDataID then
-            -- Use PlaySoundFile for FileDataIDs
-            PlaySoundFile(soundData.fileDataID, db.soundChannel)
-        end
+    if not soundData then
+        return
+    end
+
+    if soundData.soundKitID then
+        PlaySound(soundData.soundKitID, db.soundChannel)
+    elseif soundData.fileDataID then
+        PlaySoundFile(soundData.fileDataID, db.soundChannel)
     end
 end
 
 local function ShowNotification(message)
-    if not db.textEnabled then return end
+    if not db.textEnabled then
+        return
+    end
 
     local frame = notificationFrame
-    if not frame then return end
+    if not frame then
+        return
+    end
 
-    -- Update text content
     frame.text:SetText(message)
-
-    -- Cancel any existing fade animations
     UIFrameFadeRemoveFrame(frame)
-
-    -- Fade in
     frame:Show()
     UIFrameFadeIn(frame, 0.5, 0, 1)
 
-    -- Schedule fade out
     local holdTime = math.max(db.displayDuration - 1.0, 1.0)
     C_Timer.After(0.5 + holdTime, function()
         UIFrameFadeOut(frame, 0.5, 1, 0)
@@ -160,7 +131,9 @@ local function ShowNotification(message)
 end
 
 local function ShowChatNotification(message)
-    if not db.chatEnabled then return end
+    if not db.chatEnabled then
+        return
+    end
 
     print("|cff00ff00" .. ADDON_TITLE .. ":|r " .. message)
 end
@@ -181,10 +154,12 @@ local function CreateNotificationFrame()
 end
 
 local function UpdateNotificationFramePosition()
-    if notificationFrame then
-        notificationFrame:ClearAllPoints()
-        notificationFrame:SetPoint("CENTER", UIParent, "CENTER", db.textOffsetX, db.textOffsetY)
+    if not notificationFrame then
+        return
     end
+
+    notificationFrame:ClearAllPoints()
+    notificationFrame:SetPoint("CENTER", UIParent, "CENTER", db.textOffsetX, db.textOffsetY)
 end
 
 local function UpdateNotificationFrameScale()
@@ -202,26 +177,24 @@ end
 local function ApplyBackgroundSoundSetting()
     if db.playInBackground then
         SetCVar("Sound_EnableSoundWhenGameIsInBG", "1")
+        return
+    end
+
+    if db.originalBGSoundCVar then
+        SetCVar("Sound_EnableSoundWhenGameIsInBG", db.originalBGSoundCVar)
     else
-        -- Restore original value
-        if db.originalBGSoundCVar then
-            SetCVar("Sound_EnableSoundWhenGameIsInBG", db.originalBGSoundCVar)
-        else
-            SetCVar("Sound_EnableSoundWhenGameIsInBG", "0")
-        end
+        SetCVar("Sound_EnableSoundWhenGameIsInBG", "0")
     end
 end
 
--- ============================================================================
--- Event Handlers
--- ============================================================================
-
 local function OnSystemMessage(self, event, message, ...)
-    local orderType = GetOrderMessageType(message)
-    if not orderType then return end
+    if not IsPersonalOrderMessage(message) then
+        return
+    end
 
-    if IsSuppressed() then return end
-    if not CanNotify() then return end
+    if IsSuppressed() or not CanNotify() then
+        return
+    end
 
     PlayNotificationSound()
     ShowNotification(db.orderMessage)
@@ -229,7 +202,6 @@ local function OnSystemMessage(self, event, message, ...)
 end
 
 local function OnLogin()
-    -- Initialize SavedVariables
     local saved = _G[SAVED_VARIABLES_NAME]
     if not saved then
         saved = {}
@@ -238,21 +210,17 @@ local function OnLogin()
     _G[SAVED_VARIABLES_NAME] = saved
     db = saved
 
-    -- Migrate old personalMessage to orderMessage
     if db.personalMessage and not db.orderMessage then
         db.orderMessage = db.personalMessage
     end
-    -- Clean up old guild message
     db.personalMessage = nil
-    db.guildMessage = nil
 
-    -- Apply defaults for missing values
     for key, value in pairs(DEFAULTS) do
         if db[key] == nil then
             if type(value) == "table" then
                 db[key] = {}
-                for k, v in pairs(value) do
-                    db[key][k] = v
+                for childKey, childValue in pairs(value) do
+                    db[key][childKey] = childValue
                 end
             else
                 db[key] = value
@@ -260,25 +228,20 @@ local function OnLogin()
         end
     end
 
-    -- Ensure textColor table is complete
     if db.textColor then
         if db.textColor.r == nil then db.textColor.r = 1 end
         if db.textColor.g == nil then db.textColor.g = 1 end
         if db.textColor.b == nil then db.textColor.b = 0 end
     end
 
-    -- Store original background sound CVar if not already stored
     if db.originalBGSoundCVar == nil then
         db.originalBGSoundCVar = GetCVar("Sound_EnableSoundWhenGameIsInBG")
     end
 
-    -- Apply background sound setting
     ApplyBackgroundSoundSetting()
-
-    -- Create notification frame
     notificationFrame = CreateNotificationFrame()
 
-    -- Make functions available to other modules
+    -- These helpers are consumed by the options panel.
     addon.db = db
     addon.PlayNotificationSound = PlayNotificationSound
     addon.ShowNotification = ShowNotification
@@ -287,23 +250,10 @@ local function OnLogin()
     addon.UpdateNotificationFrameScale = UpdateNotificationFrameScale
     addon.UpdateNotificationFrameColor = UpdateNotificationFrameColor
     addon.ApplyBackgroundSoundSetting = ApplyBackgroundSoundSetting
-    addon.GetOrderMessageType = GetOrderMessageType
+    addon.IsPersonalOrderMessage = IsPersonalOrderMessage
 
     print("|cff00ff00" .. ADDON_TITLE .. "|r v1.0.0 loaded. Type |cff00ff00/noa|r for options.")
 end
-
-local function OnLogout()
-    -- Optionally restore CVar on logout (commented out for now)
-    -- This allows the setting to persist across sessions
-    -- Uncomment if you want to restore the original value
-    -- if db.originalBGSoundCVar then
-    --     SetCVar("Sound_EnableSoundWhenGameIsInBG", db.originalBGSoundCVar)
-    -- end
-end
-
--- ============================================================================
--- Initialization
--- ============================================================================
 
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterEvent("PLAYER_LOGIN")

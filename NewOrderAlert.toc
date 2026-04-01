@@ -1,7 +1,7 @@
 ## Interface: 120000,120001
 ## Title: NewOrderAlert
 ## Author: NatYaphis
-## Version: 1.0.0
+## Version: 1.0.1
 ## Notes: Notifies crafters when they receive Personal Crafting Orders with customizable sound and visual alerts.
 ## SavedVariables: NewOrderAlertDB
 ## Category: Professions

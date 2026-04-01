@@ -1,12 +1,12 @@
 # NewOrderAlert
 
-A World of Warcraft addon that notifies crafters when they receive new Personal or Guild Crafting Orders with customizable sound and visual alerts.
+A World of Warcraft addon that notifies crafters when they receive new Personal Crafting Orders with customizable sound and visual alerts.
 
 ## Features
 
 - **Sound Notifications** - Choose from 12 curated in-game sounds
 - **Visual Notifications** - Customizable on-screen text with fade animations
-- **Order Type Detection** - Separate messages for Personal and Guild orders
+- **Order Type Detection** - Detects Personal Crafting Order system messages
 - **Multi-Account Friendly** - Different sounds per character help identify which account received an order
 - **Background Sound** - Play notifications even when WoW is alt-tabbed
 - **Smart Suppression** - Optionally disable notifications during combat or in instances/raids
@@ -68,8 +68,7 @@ You can also use the **Test Notification** button in the settings panel.
 - **Y Offset** - Move text vertically (-500 to 500)
 - **Duration** - How long text stays visible (2 to 10 seconds)
 - **Font Color** - Choose any color via color picker
-- **Personal Order Message** - Customize the text shown for Personal orders
-- **Guild Order Message** - Customize the text shown for Guild orders
+- **Order Message** - Customize the text shown for Personal orders
 
 ### Suppression Settings
 
@@ -90,14 +89,13 @@ If you run multiple WoW accounts simultaneously:
 Example setup:
 - Account 1 (Main crafter): Raid Warning
 - Account 2 (Alt crafter): Gold Coins
-- Account 3 (Guild bank): Auction Window
+- Account 3 (Second crafter): Auction Window
 
 ## How It Works
 
-The addon monitors in-game system messages for crafting order notifications:
+The addon monitors in-game system messages for personal crafting order notifications:
 
 - **Personal Orders**: Detects "You have received a new Personal Crafting Order."
-- **Guild Orders**: Detects "You have received a new Guild Crafting Order."
 
 When detected (and not suppressed), it:
 1. Plays your selected sound
@@ -158,7 +156,7 @@ This addon is provided as-is. Feel free to modify for personal use.
 
 ### Version 1.0.0 (2026-01-25)
 - Initial release
-- Sound and visual notifications for Personal and Guild orders
+- Sound and visual notifications for Personal orders
 - 12 curated sound options
 - Full customization of text appearance and position
 - Combat and instance suppression

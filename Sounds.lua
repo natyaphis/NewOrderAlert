@@ -1,11 +1,6 @@
--- NewOrderAlert - Sounds
--- Curated list of in-game sounds for notifications
-
 local addonName, addon = ...
 
--- Sound list with SoundKitIDs and FileDataIDs
--- soundKitID: Use with PlaySound() - standard WoW sound kit IDs
--- fileDataID: Use with PlaySoundFile() - file-based sounds from Wowhead
+-- SoundKit IDs use PlaySound; fileDataIDs use PlaySoundFile.
 addon.SOUND_LIST = {
     { label = "Raid Warning", soundKitID = 8959 },
     { label = "Ready Check", soundKitID = 8960 },
