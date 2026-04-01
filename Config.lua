@@ -1,0 +1,536 @@
+-- NewOrderAlert - Configuration
+-- Interface Options panel and slash commands
+
+local addonName, addon = ...
+local ADDON_TITLE = "NewOrderAlert"
+
+local db
+
+-- ============================================================================
+-- UI Helper Functions
+-- ============================================================================
+
+local function CreateCheckbox(parent, label, tooltip)
+    local check = CreateFrame("CheckButton", nil, parent, "InterfaceOptionsCheckButtonTemplate")
+    check.Text:SetText(label)
+    check:SetEnabled(true)
+    if tooltip then
+        check.tooltipText = tooltip
+    end
+    return check
+end
+
+local function CreateSlider(parent, label, minVal, maxVal, step)
+    local slider = CreateFrame("Slider", nil, parent, "OptionsSliderTemplate")
+    slider:SetMinMaxValues(minVal, maxVal)
+    slider:SetValueStep(step)
+    slider:SetObeyStepOnDrag(true)
+    slider:SetEnabled(true)
+    slider.Text:SetText(label)
+    slider.Low:SetText(minVal)
+    slider.High:SetText(maxVal)
+    -- Set a default value to show the thumb
+    local defaultValue = (minVal + maxVal) / 2
+    slider:SetValue(defaultValue)
+    return slider
+end
+
+local function CreateDropdown(parent, label, width)
+    local dropdown = CreateFrame("Frame", nil, parent, "UIDropDownMenuTemplate")
+
+    local labelText = dropdown:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    labelText:SetPoint("BOTTOMLEFT", dropdown, "TOPLEFT", 20, 3)
+    labelText:SetText(label)
+    dropdown.label = labelText
+
+    return dropdown
+end
+
+local function CreateEditBox(parent, width)
+    local editbox = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
+    editbox:SetSize(width or 300, 20)
+    editbox:SetAutoFocus(false)
+    editbox:SetEnabled(true)
+    editbox:SetFontObject("GameFontHighlight")
+    editbox:SetJustifyH("LEFT")
+    return editbox
+end
+
+local function CreateColorPicker(parent, label)
+    local button = CreateFrame("Button", nil, parent)
+    button:SetSize(24, 24)
+    button:SetEnabled(true)
+
+    -- Border
+    local border = button:CreateTexture(nil, "BORDER")
+    border:SetAllPoints(button)
+    border:SetColorTexture(0.3, 0.3, 0.3, 1)
+
+    -- Color swatch (slightly inset)
+    local texture = button:CreateTexture(nil, "ARTWORK")
+    texture:SetPoint("TOPLEFT", 2, -2)
+    texture:SetPoint("BOTTOMRIGHT", -2, 2)
+    texture:SetColorTexture(1, 1, 0)
+    button.texture = texture
+
+    -- Highlight
+    local highlight = button:CreateTexture(nil, "HIGHLIGHT")
+    highlight:SetAllPoints(button)
+    highlight:SetColorTexture(1, 1, 1, 0.3)
+
+    local labelText = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    labelText:SetPoint("LEFT", button, "RIGHT", 8, 0)
+    labelText:SetText(label)
+    button.label = labelText
+
+    return button
+end
+
+-- ============================================================================
+-- Options Panel
+-- ============================================================================
+
+local function CreateOptionsPanel()
+    local panel = CreateFrame("Frame", "NewOrderAlertOptionsPanel", UIParent)
+    panel.name = ADDON_TITLE
+
+    -- Title
+    local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    title:SetPoint("TOPLEFT", 16, -16)
+    title:SetText(ADDON_TITLE)
+
+    -- Subtitle
+    local subtitle = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -2)
+    subtitle:SetText("|cffaaaaaa by Nathan  •  v1.0.0|r")
+
+    local yOffset = -52
+
+    -- ========================================================================
+    -- SOUND Section
+    -- ========================================================================
+
+    -- Divider
+    local divider1 = panel:CreateTexture(nil, "ARTWORK")
+    divider1:SetColorTexture(0.4, 0.4, 0.4, 0.6)
+    divider1:SetSize(570, 1)
+    divider1:SetPoint("TOPLEFT", 10, yOffset)
+    yOffset = yOffset - 8
+
+    local soundHeader = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    soundHeader:SetPoint("TOPLEFT", 16, yOffset)
+    soundHeader:SetText("|cffffff00Sound|r")
+    soundHeader:SetTextScale(1.15)
+    yOffset = yOffset - 22
+
+    -- Enable Sound and Play in Background (same row)
+    local enableSound = CreateCheckbox(panel, "Enable Sound Notifications")
+    enableSound:SetPoint("TOPLEFT", 16, yOffset)
+
+    local playInBackground = CreateCheckbox(panel, "Play sound when WoW is in background")
+    playInBackground:SetPoint("TOPLEFT", 250, yOffset)
+    yOffset = yOffset - 40
+
+    -- Sound and Channel Dropdowns (same row)
+    local soundDropdown = CreateDropdown(panel, "Sound", 150)
+    soundDropdown:SetPoint("TOPLEFT", 16, yOffset)
+
+    local channelDropdown = CreateDropdown(panel, "Channel", 100)
+    channelDropdown:SetPoint("TOPLEFT", 250, yOffset)
+    yOffset = yOffset - 35
+
+    -- Test Button
+    local testButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    testButton:SetSize(140, 24)
+    testButton:SetPoint("TOPLEFT", 16, yOffset)
+    testButton:SetText("Test Notification")
+    testButton:SetEnabled(true)
+    yOffset = yOffset - 32
+
+    -- ========================================================================
+    -- DISPLAY Section
+    -- ========================================================================
+
+    -- Divider
+    local divider2 = panel:CreateTexture(nil, "ARTWORK")
+    divider2:SetColorTexture(0.4, 0.4, 0.4, 0.6)
+    divider2:SetSize(570, 1)
+    divider2:SetPoint("TOPLEFT", 10, yOffset)
+    yOffset = yOffset - 8
+
+    local displayHeader = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    displayHeader:SetPoint("TOPLEFT", 16, yOffset)
+    displayHeader:SetText("|cffffff00Display|r")
+    displayHeader:SetTextScale(1.15)
+    yOffset = yOffset - 22
+
+    -- Enable Text
+    local enableText = CreateCheckbox(panel, "Enable On-Screen Text")
+    enableText:SetPoint("TOPLEFT", 16, yOffset)
+
+    -- Enable Chat Message
+    local enableChat = CreateCheckbox(panel, "Enable Chat Message")
+    enableChat:SetPoint("TOPLEFT", 250, yOffset)
+    yOffset = yOffset - 40
+
+    -- Scale and Duration Sliders (same row)
+    local scaleSlider = CreateSlider(panel, "Scale", 0.5, 2.0, 0.1)
+    scaleSlider:SetPoint("TOPLEFT", 16, yOffset)
+    scaleSlider:SetWidth(180)
+
+    local durationSlider = CreateSlider(panel, "Display Duration (sec)", 2, 10, 1)
+    durationSlider:SetPoint("TOPLEFT", 250, yOffset)
+    durationSlider:SetWidth(180)
+    yOffset = yOffset - 35
+
+    -- X Offset Slider
+    local xOffsetSlider = CreateSlider(panel, "X Position", -960, 960, 5)
+    xOffsetSlider:SetPoint("TOPLEFT", 16, yOffset)
+    xOffsetSlider:SetWidth(130)
+
+    -- X Offset Manual Entry
+    local xOffsetBox = CreateEditBox(panel, 45)
+    xOffsetBox:SetPoint("LEFT", xOffsetSlider, "RIGHT", 8, 0)
+    xOffsetBox:SetMaxLetters(5)
+
+    -- Y Offset Slider
+    local yOffsetSlider = CreateSlider(panel, "Y Position", -500, 500, 5)
+    yOffsetSlider:SetPoint("TOPLEFT", 250, yOffset)
+    yOffsetSlider:SetWidth(130)
+
+    -- Y Offset Manual Entry
+    local yOffsetBox = CreateEditBox(panel, 45)
+    yOffsetBox:SetPoint("LEFT", yOffsetSlider, "RIGHT", 8, 0)
+    yOffsetBox:SetMaxLetters(5)
+
+    yOffset = yOffset - 35
+
+    -- Font Color
+    local colorPicker = CreateColorPicker(panel, "Font Color")
+    colorPicker:SetPoint("TOPLEFT", 16, yOffset)
+    yOffset = yOffset - 30
+
+    -- Order Message
+    local orderLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    orderLabel:SetPoint("TOPLEFT", 16, yOffset)
+    orderLabel:SetText("Notification Message")
+    yOffset = yOffset - 20
+
+    local orderMessage = CreateEditBox(panel, 360)
+    orderMessage:SetPoint("TOPLEFT", 16, yOffset)
+
+    local orderSaveButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    orderSaveButton:SetSize(55, 22)
+    orderSaveButton:SetPoint("LEFT", orderMessage, "RIGHT", 6, 0)
+    orderSaveButton:SetText("Save")
+    orderSaveButton:SetEnabled(true)
+
+    yOffset = yOffset - 30
+
+    -- ========================================================================
+    -- SUPPRESSION Section
+    -- ========================================================================
+
+    -- Divider
+    local divider3 = panel:CreateTexture(nil, "ARTWORK")
+    divider3:SetColorTexture(0.4, 0.4, 0.4, 0.6)
+    divider3:SetSize(570, 1)
+    divider3:SetPoint("TOPLEFT", 10, yOffset)
+    yOffset = yOffset - 8
+
+    local suppressHeader = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    suppressHeader:SetPoint("TOPLEFT", 16, yOffset)
+    suppressHeader:SetText("|cffffff00Suppression|r")
+    suppressHeader:SetTextScale(1.15)
+    yOffset = yOffset - 22
+
+    -- Suppress in Combat
+    local suppressCombat = CreateCheckbox(panel, "Suppress notifications in combat")
+    suppressCombat:SetPoint("TOPLEFT", 16, yOffset)
+    yOffset = yOffset - 24
+
+    -- Suppress in Instances
+    local suppressInstance = CreateCheckbox(panel, "Suppress notifications in instances/raids")
+    suppressInstance:SetPoint("TOPLEFT", 16, yOffset)
+
+    -- ========================================================================
+    -- Initialization and Callbacks
+    -- ========================================================================
+
+    local function RefreshPanel()
+        if not db then
+            db = addon.db
+        end
+
+        if not db then return end
+
+        -- Sound settings
+        enableSound:SetChecked(db.soundEnabled)
+        playInBackground:SetChecked(db.playInBackground)
+
+        -- Initialize dropdowns
+        if addon.SOUND_LIST and addon.SOUND_LIST[db.soundIndex] then
+            UIDropDownMenu_SetSelectedValue(soundDropdown, db.soundIndex)
+            UIDropDownMenu_SetText(soundDropdown, addon.SOUND_LIST[db.soundIndex].label)
+        end
+        UIDropDownMenu_SetSelectedValue(channelDropdown, db.soundChannel)
+        UIDropDownMenu_SetText(channelDropdown, db.soundChannel)
+
+        -- Display settings
+        enableText:SetChecked(db.textEnabled)
+        enableChat:SetChecked(db.chatEnabled)
+        scaleSlider:SetValue(db.textScale)
+        scaleSlider.Text:SetText(string.format("Scale: %.1f", db.textScale))
+        xOffsetSlider:SetValue(db.textOffsetX)
+        xOffsetSlider.Text:SetText(string.format("X Position: %d", db.textOffsetX))
+        xOffsetBox:SetText(tostring(db.textOffsetX))
+        yOffsetSlider:SetValue(db.textOffsetY)
+        yOffsetSlider.Text:SetText(string.format("Y Position: %d", db.textOffsetY))
+        yOffsetBox:SetText(tostring(db.textOffsetY))
+        durationSlider:SetValue(db.displayDuration)
+        durationSlider.Text:SetText(string.format("Display Duration: %d sec", db.displayDuration))
+
+        -- Message - ensure it's set
+        if db.orderMessage then
+            orderMessage:SetText(db.orderMessage)
+            orderMessage:SetCursorPosition(0)
+        end
+
+        -- Suppression settings
+        suppressCombat:SetChecked(db.suppressInCombat)
+        suppressInstance:SetChecked(db.suppressInInstance)
+
+        -- Color picker
+        colorPicker.texture:SetColorTexture(db.textColor.r, db.textColor.g, db.textColor.b)
+    end
+
+    panel.refresh = RefreshPanel
+    panel:SetScript("OnShow", RefreshPanel)
+
+    -- Enable Sound
+    enableSound:SetScript("OnClick", function(self)
+        db.soundEnabled = self:GetChecked()
+    end)
+
+    -- Sound Dropdown
+    UIDropDownMenu_Initialize(soundDropdown, function(self, level)
+        for i, soundData in ipairs(addon.SOUND_LIST) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = soundData.label
+            info.value = i
+            info.func = function()
+                db.soundIndex = i
+                UIDropDownMenu_SetSelectedValue(soundDropdown, i)
+                UIDropDownMenu_SetText(soundDropdown, soundData.label)
+            end
+            info.checked = (db.soundIndex == i)
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+    UIDropDownMenu_SetWidth(soundDropdown, 150)
+    UIDropDownMenu_SetButtonWidth(soundDropdown, 124)
+    UIDropDownMenu_JustifyText(soundDropdown, "LEFT")
+
+    -- Channel Dropdown
+    UIDropDownMenu_Initialize(channelDropdown, function(self, level)
+        local channels = {"Master", "SFX"}
+        for _, channel in ipairs(channels) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = channel
+            info.value = channel
+            info.func = function()
+                db.soundChannel = channel
+                UIDropDownMenu_SetSelectedValue(channelDropdown, channel)
+                UIDropDownMenu_SetText(channelDropdown, channel)
+            end
+            info.checked = (db.soundChannel == channel)
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+    UIDropDownMenu_SetWidth(channelDropdown, 100)
+    UIDropDownMenu_SetButtonWidth(channelDropdown, 74)
+    UIDropDownMenu_JustifyText(channelDropdown, "LEFT")
+
+    -- Play in Background
+    playInBackground:SetScript("OnClick", function(self)
+        db.playInBackground = self:GetChecked()
+        addon.ApplyBackgroundSoundSetting()
+    end)
+
+    -- Test Button
+    testButton:SetScript("OnClick", function()
+        addon.PlayNotificationSound()
+        addon.ShowNotification(db.orderMessage)
+        addon.ShowChatNotification(db.orderMessage)
+    end)
+
+    -- Enable Text
+    enableText:SetScript("OnClick", function(self)
+        db.textEnabled = self:GetChecked()
+    end)
+
+    -- Enable Chat
+    enableChat:SetScript("OnClick", function(self)
+        db.chatEnabled = self:GetChecked()
+    end)
+
+    -- Scale Slider
+    scaleSlider:SetScript("OnValueChanged", function(self, value)
+        db.textScale = value
+        self.Text:SetText(string.format("Scale: %.1f", value))
+        addon.UpdateNotificationFrameScale()
+    end)
+
+    -- X Offset Slider
+    xOffsetSlider:SetScript("OnValueChanged", function(self, value)
+        db.textOffsetX = value
+        self.Text:SetText(string.format("X Position: %d", value))
+        xOffsetBox:SetText(tostring(math.floor(value)))
+        addon.UpdateNotificationFramePosition()
+    end)
+
+    -- X Offset Manual Entry
+    xOffsetBox:SetScript("OnEnterPressed", function(self)
+        local value = tonumber(self:GetText()) or 0
+        value = math.max(-960, math.min(960, value))
+        db.textOffsetX = value
+        xOffsetSlider:SetValue(value)
+        self:ClearFocus()
+        addon.UpdateNotificationFramePosition()
+    end)
+    xOffsetBox:SetScript("OnEscapePressed", function(self)
+        self:SetText(tostring(db.textOffsetX))
+        self:ClearFocus()
+    end)
+
+    -- Y Offset Slider
+    yOffsetSlider:SetScript("OnValueChanged", function(self, value)
+        db.textOffsetY = value
+        self.Text:SetText(string.format("Y Position: %d", value))
+        yOffsetBox:SetText(tostring(math.floor(value)))
+        addon.UpdateNotificationFramePosition()
+    end)
+
+    -- Y Offset Manual Entry
+    yOffsetBox:SetScript("OnEnterPressed", function(self)
+        local value = tonumber(self:GetText()) or 0
+        value = math.max(-500, math.min(500, value))
+        db.textOffsetY = value
+        yOffsetSlider:SetValue(value)
+        self:ClearFocus()
+        addon.UpdateNotificationFramePosition()
+    end)
+    yOffsetBox:SetScript("OnEscapePressed", function(self)
+        self:SetText(tostring(db.textOffsetY))
+        self:ClearFocus()
+    end)
+
+    -- Duration Slider
+    durationSlider:SetScript("OnValueChanged", function(self, value)
+        db.displayDuration = value
+        self.Text:SetText(string.format("Display Duration: %d sec", value))
+    end)
+
+    -- Color Picker
+    colorPicker:SetScript("OnClick", function(self)
+        local info = {
+            r = db.textColor.r,
+            g = db.textColor.g,
+            b = db.textColor.b,
+            hasOpacity = false,
+            swatchFunc = function()
+                local r, g, b = ColorPickerFrame:GetColorRGB()
+                db.textColor.r = r
+                db.textColor.g = g
+                db.textColor.b = b
+                colorPicker.texture:SetColorTexture(r, g, b)
+                addon.UpdateNotificationFrameColor()
+            end,
+            cancelFunc = function()
+                local r, g, b = ColorPickerFrame:GetPreviousValues()
+                db.textColor.r = r
+                db.textColor.g = g
+                db.textColor.b = b
+                colorPicker.texture:SetColorTexture(r, g, b)
+                addon.UpdateNotificationFrameColor()
+            end,
+        }
+        ColorPickerFrame:SetupColorPickerAndShow(info)
+    end)
+
+    -- Order Message Save Button
+    orderSaveButton:SetScript("OnClick", function()
+        db.orderMessage = orderMessage:GetText()
+        print("|cff00ff00" .. ADDON_TITLE .. ":|r Message saved.")
+    end)
+    orderMessage:SetScript("OnEnterPressed", function(self)
+        db.orderMessage = self:GetText()
+        self:ClearFocus()
+        print("|cff00ff00" .. ADDON_TITLE .. ":|r Message saved.")
+    end)
+    orderMessage:SetScript("OnEscapePressed", function(self)
+        self:SetText(db.orderMessage)
+        self:ClearFocus()
+    end)
+
+    -- Suppress in Combat
+    suppressCombat:SetScript("OnClick", function(self)
+        db.suppressInCombat = self:GetChecked()
+    end)
+
+    -- Suppress in Instances
+    suppressInstance:SetScript("OnClick", function(self)
+        db.suppressInInstance = self:GetChecked()
+    end)
+
+    -- Register panel with modern Settings API
+    local category, layout = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
+    Settings.RegisterAddOnCategory(category)
+    panel.category = category
+
+    -- Initialize panel state
+    RefreshPanel()
+
+    return panel, category
+end
+
+-- ============================================================================
+-- Slash Commands
+-- ============================================================================
+
+local function SlashCommandHandler(msg)
+    if not db then
+        db = addon.db
+    end
+
+    msg = strtrim(msg:lower())
+
+    if msg == "test" then
+        -- Test order notification (bypasses suppression and throttle)
+        addon.PlayNotificationSound()
+        addon.ShowNotification(db.orderMessage)
+        addon.ShowChatNotification(db.orderMessage)
+        print("|cff00ff00" .. ADDON_TITLE .. ":|r Testing order notification")
+    else
+        -- Open config panel using modern Settings API
+        if addon.settingsCategory then
+            Settings.OpenToCategory(addon.settingsCategory:GetID())
+        end
+    end
+end
+
+SLASH_NEWORDERALERT1 = "/noa"
+SLASH_NEWORDERALERT2 = "/neworderalert"
+SlashCmdList["NEWORDERALERT"] = SlashCommandHandler
+
+-- ============================================================================
+-- Initialization
+-- ============================================================================
+
+local initFrame = CreateFrame("Frame")
+initFrame:RegisterEvent("PLAYER_LOGIN")
+initFrame:SetScript("OnEvent", function()
+    db = addon.db
+    local panel, category = CreateOptionsPanel()
+    addon.settingsCategory = category
+end)
