@@ -1,20 +1,10 @@
 local addonName, addon = ...
-local ADDON_TITLE = "NewOrderAlert"
+local L = addon.L
+local ADDON_TITLE = L["ADDON_TITLE"]
 local SAVED_VARIABLES_NAME = "NewOrderAlertDB"
+local VERSION = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addonName, "Version") or "unknown"
 
 local THROTTLE_SECONDS = 3
-local LOCALE = GetLocale and GetLocale() or "enUS"
-local ORDER_MESSAGE_PATTERNS = {
-    enUS = {
-        personal = { "Crafting Order", "received", "Personal" },
-    },
-    zhCN = {
-        personal = { "制作订单", "个人" },
-    },
-    zhTW = {
-        personal = { "製作訂單", "個人" },
-    },
-}
 
 local DEFAULTS = {
     soundEnabled = true,
@@ -27,7 +17,7 @@ local DEFAULTS = {
     textOffsetX = 0,
     textOffsetY = 200,
     displayDuration = 3,
-    orderMessage = "New Personal Crafting Order!",
+    orderMessage = L["DEFAULT_ORDER_MESSAGE"],
     chatEnabled = false,
     suppressInCombat = true,
     suppressInInstance = true,
@@ -52,17 +42,7 @@ local function MessageContainsAll(message, parts)
 end
 
 local function IsPersonalOrderMessage(message)
-    local patterns = ORDER_MESSAGE_PATTERNS[LOCALE] or ORDER_MESSAGE_PATTERNS.enUS
-
-    if patterns and MessageContainsAll(message, patterns.personal) then
-        return true
-    end
-
-    if LOCALE ~= "enUS" and MessageContainsAll(message, ORDER_MESSAGE_PATTERNS.enUS.personal) then
-        return true
-    end
-
-    return false
+    return MessageContainsAll(message, L["PERSONAL_ORDER_PATTERNS"])
 end
 
 local function CanNotify()
@@ -135,7 +115,7 @@ local function ShowChatNotification(message)
         return
     end
 
-    print("|cff00ff00" .. ADDON_TITLE .. ":|r " .. message)
+    print(string.format(L["CHAT_PREFIX"], ADDON_TITLE, message))
 end
 
 local function CreateNotificationFrame()
@@ -241,7 +221,6 @@ local function OnLogin()
     ApplyBackgroundSoundSetting()
     notificationFrame = CreateNotificationFrame()
 
-    -- These helpers are consumed by the options panel.
     addon.db = db
     addon.PlayNotificationSound = PlayNotificationSound
     addon.ShowNotification = ShowNotification
@@ -252,7 +231,7 @@ local function OnLogin()
     addon.ApplyBackgroundSoundSetting = ApplyBackgroundSoundSetting
     addon.IsPersonalOrderMessage = IsPersonalOrderMessage
 
-    print("|cff00ff00" .. ADDON_TITLE .. "|r v1.0.0 loaded. Type |cff00ff00/noa|r for options.")
+    print(string.format(L["LOADED_MESSAGE"], ADDON_TITLE, VERSION))
 end
 
 local eventFrame = CreateFrame("Frame")

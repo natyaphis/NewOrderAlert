@@ -1,5 +1,7 @@
 local addonName, addon = ...
-local ADDON_TITLE = "NewOrderAlert"
+local L = addon.L
+local ADDON_TITLE = L["ADDON_TITLE"]
+local VERSION = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addonName, "Version") or "unknown"
 
 local db
 
@@ -84,7 +86,7 @@ local function CreateOptionsPanel()
 
     local subtitle = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -2)
-    subtitle:SetText("|cffaaaaaa by Nathan  •  v1.0.0|r")
+    subtitle:SetText(string.format(L["PANEL_SUBTITLE"], "Nathan", VERSION))
 
     local yOffset = -52
 
@@ -96,28 +98,28 @@ local function CreateOptionsPanel()
 
     local soundHeader = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     soundHeader:SetPoint("TOPLEFT", 16, yOffset)
-    soundHeader:SetText("|cffffff00Sound|r")
+    soundHeader:SetText(L["SECTION_SOUND"])
     soundHeader:SetTextScale(1.15)
     yOffset = yOffset - 22
 
-    local enableSound = CreateCheckbox(panel, "Enable Sound Notifications")
+    local enableSound = CreateCheckbox(panel, L["ENABLE_SOUND"])
     enableSound:SetPoint("TOPLEFT", 16, yOffset)
 
-    local playInBackground = CreateCheckbox(panel, "Play sound when WoW is in background")
+    local playInBackground = CreateCheckbox(panel, L["PLAY_IN_BACKGROUND"])
     playInBackground:SetPoint("TOPLEFT", 250, yOffset)
     yOffset = yOffset - 40
 
-    local soundDropdown = CreateDropdown(panel, "Sound", 150)
+    local soundDropdown = CreateDropdown(panel, L["SOUND"], 150)
     soundDropdown:SetPoint("TOPLEFT", 16, yOffset)
 
-    local channelDropdown = CreateDropdown(panel, "Channel", 100)
+    local channelDropdown = CreateDropdown(panel, L["CHANNEL"], 100)
     channelDropdown:SetPoint("TOPLEFT", 250, yOffset)
     yOffset = yOffset - 35
 
     local testButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
     testButton:SetSize(140, 24)
     testButton:SetPoint("TOPLEFT", 16, yOffset)
-    testButton:SetText("Test Notification")
+    testButton:SetText(L["TEST_NOTIFICATION"])
     testButton:SetEnabled(true)
     yOffset = yOffset - 32
 
@@ -129,27 +131,27 @@ local function CreateOptionsPanel()
 
     local displayHeader = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     displayHeader:SetPoint("TOPLEFT", 16, yOffset)
-    displayHeader:SetText("|cffffff00Display|r")
+    displayHeader:SetText(L["SECTION_DISPLAY"])
     displayHeader:SetTextScale(1.15)
     yOffset = yOffset - 22
 
-    local enableText = CreateCheckbox(panel, "Enable On-Screen Text")
+    local enableText = CreateCheckbox(panel, L["ENABLE_TEXT"])
     enableText:SetPoint("TOPLEFT", 16, yOffset)
 
-    local enableChat = CreateCheckbox(panel, "Enable Chat Message")
+    local enableChat = CreateCheckbox(panel, L["ENABLE_CHAT"])
     enableChat:SetPoint("TOPLEFT", 250, yOffset)
     yOffset = yOffset - 40
 
-    local scaleSlider = CreateSlider(panel, "Scale", 0.5, 2.0, 0.1)
+    local scaleSlider = CreateSlider(panel, L["SCALE"], 0.5, 2.0, 0.1)
     scaleSlider:SetPoint("TOPLEFT", 16, yOffset)
     scaleSlider:SetWidth(180)
 
-    local durationSlider = CreateSlider(panel, "Display Duration (sec)", 2, 10, 1)
+    local durationSlider = CreateSlider(panel, L["DISPLAY_DURATION"], 2, 10, 1)
     durationSlider:SetPoint("TOPLEFT", 250, yOffset)
     durationSlider:SetWidth(180)
     yOffset = yOffset - 35
 
-    local xOffsetSlider = CreateSlider(panel, "X Position", -960, 960, 5)
+    local xOffsetSlider = CreateSlider(panel, L["X_POSITION"], -960, 960, 5)
     xOffsetSlider:SetPoint("TOPLEFT", 16, yOffset)
     xOffsetSlider:SetWidth(130)
 
@@ -157,7 +159,7 @@ local function CreateOptionsPanel()
     xOffsetBox:SetPoint("LEFT", xOffsetSlider, "RIGHT", 8, 0)
     xOffsetBox:SetMaxLetters(5)
 
-    local yOffsetSlider = CreateSlider(panel, "Y Position", -500, 500, 5)
+    local yOffsetSlider = CreateSlider(panel, L["Y_POSITION"], -500, 500, 5)
     yOffsetSlider:SetPoint("TOPLEFT", 250, yOffset)
     yOffsetSlider:SetWidth(130)
 
@@ -167,13 +169,13 @@ local function CreateOptionsPanel()
 
     yOffset = yOffset - 35
 
-    local colorPicker = CreateColorPicker(panel, "Font Color")
+    local colorPicker = CreateColorPicker(panel, L["FONT_COLOR"])
     colorPicker:SetPoint("TOPLEFT", 16, yOffset)
     yOffset = yOffset - 30
 
     local orderLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     orderLabel:SetPoint("TOPLEFT", 16, yOffset)
-    orderLabel:SetText("Notification Message")
+    orderLabel:SetText(L["NOTIFICATION_MESSAGE"])
     yOffset = yOffset - 20
 
     local orderMessage = CreateEditBox(panel, 360)
@@ -182,7 +184,7 @@ local function CreateOptionsPanel()
     local orderSaveButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
     orderSaveButton:SetSize(55, 22)
     orderSaveButton:SetPoint("LEFT", orderMessage, "RIGHT", 6, 0)
-    orderSaveButton:SetText("Save")
+    orderSaveButton:SetText(L["SAVE"])
     orderSaveButton:SetEnabled(true)
 
     yOffset = yOffset - 30
@@ -195,19 +197,17 @@ local function CreateOptionsPanel()
 
     local suppressHeader = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     suppressHeader:SetPoint("TOPLEFT", 16, yOffset)
-    suppressHeader:SetText("|cffffff00Suppression|r")
+    suppressHeader:SetText(L["SECTION_SUPPRESSION"])
     suppressHeader:SetTextScale(1.15)
     yOffset = yOffset - 22
 
-    local suppressCombat = CreateCheckbox(panel, "Suppress notifications in combat")
+    local suppressCombat = CreateCheckbox(panel, L["SUPPRESS_COMBAT"])
     suppressCombat:SetPoint("TOPLEFT", 16, yOffset)
     yOffset = yOffset - 24
 
-    local suppressInstance = CreateCheckbox(panel, "Suppress notifications in instances/raids")
+    local suppressInstance = CreateCheckbox(panel, L["SUPPRESS_INSTANCE"])
     suppressInstance:SetPoint("TOPLEFT", 16, yOffset)
 
-    -- RefreshPanel keeps the controls in sync with SavedVariables when the
-    -- settings category is opened again.
     local function RefreshPanel()
         if not db then
             db = addon.db
@@ -229,15 +229,15 @@ local function CreateOptionsPanel()
         enableText:SetChecked(db.textEnabled)
         enableChat:SetChecked(db.chatEnabled)
         scaleSlider:SetValue(db.textScale)
-        scaleSlider.Text:SetText(string.format("Scale: %.1f", db.textScale))
+        scaleSlider.Text:SetText(string.format(L["SCALE_FORMAT"], db.textScale))
         xOffsetSlider:SetValue(db.textOffsetX)
-        xOffsetSlider.Text:SetText(string.format("X Position: %d", db.textOffsetX))
+        xOffsetSlider.Text:SetText(string.format(L["POSITION_FORMAT"], L["X_POSITION"], db.textOffsetX))
         xOffsetBox:SetText(tostring(db.textOffsetX))
         yOffsetSlider:SetValue(db.textOffsetY)
-        yOffsetSlider.Text:SetText(string.format("Y Position: %d", db.textOffsetY))
+        yOffsetSlider.Text:SetText(string.format(L["POSITION_FORMAT"], L["Y_POSITION"], db.textOffsetY))
         yOffsetBox:SetText(tostring(db.textOffsetY))
         durationSlider:SetValue(db.displayDuration)
-        durationSlider.Text:SetText(string.format("Display Duration: %d sec", db.displayDuration))
+        durationSlider.Text:SetText(string.format(L["DISPLAY_DURATION_FORMAT"], db.displayDuration))
 
         if db.orderMessage then
             orderMessage:SetText(db.orderMessage)
@@ -314,13 +314,13 @@ local function CreateOptionsPanel()
 
     scaleSlider:SetScript("OnValueChanged", function(self, value)
         db.textScale = value
-        self.Text:SetText(string.format("Scale: %.1f", value))
+        self.Text:SetText(string.format(L["SCALE_FORMAT"], value))
         addon.UpdateNotificationFrameScale()
     end)
 
     xOffsetSlider:SetScript("OnValueChanged", function(self, value)
         db.textOffsetX = value
-        self.Text:SetText(string.format("X Position: %d", value))
+        self.Text:SetText(string.format(L["POSITION_FORMAT"], L["X_POSITION"], value))
         xOffsetBox:SetText(tostring(math.floor(value)))
         addon.UpdateNotificationFramePosition()
     end)
@@ -340,7 +340,7 @@ local function CreateOptionsPanel()
 
     yOffsetSlider:SetScript("OnValueChanged", function(self, value)
         db.textOffsetY = value
-        self.Text:SetText(string.format("Y Position: %d", value))
+        self.Text:SetText(string.format(L["POSITION_FORMAT"], L["Y_POSITION"], value))
         yOffsetBox:SetText(tostring(math.floor(value)))
         addon.UpdateNotificationFramePosition()
     end)
@@ -360,7 +360,7 @@ local function CreateOptionsPanel()
 
     durationSlider:SetScript("OnValueChanged", function(self, value)
         db.displayDuration = value
-        self.Text:SetText(string.format("Display Duration: %d sec", value))
+        self.Text:SetText(string.format(L["DISPLAY_DURATION_FORMAT"], value))
     end)
 
     colorPicker:SetScript("OnClick", function(self)
@@ -391,12 +391,12 @@ local function CreateOptionsPanel()
 
     orderSaveButton:SetScript("OnClick", function()
         db.orderMessage = orderMessage:GetText()
-        print("|cff00ff00" .. ADDON_TITLE .. ":|r Message saved.")
+        print(string.format(L["CHAT_PREFIX"], ADDON_TITLE, L["MSG_SAVED"]))
     end)
     orderMessage:SetScript("OnEnterPressed", function(self)
         db.orderMessage = self:GetText()
         self:ClearFocus()
-        print("|cff00ff00" .. ADDON_TITLE .. ":|r Message saved.")
+        print(string.format(L["CHAT_PREFIX"], ADDON_TITLE, L["MSG_SAVED"]))
     end)
     orderMessage:SetScript("OnEscapePressed", function(self)
         self:SetText(db.orderMessage)
@@ -411,7 +411,7 @@ local function CreateOptionsPanel()
         db.suppressInInstance = self:GetChecked()
     end)
 
-    local category, layout = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
+    local category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
     Settings.RegisterAddOnCategory(category)
     panel.category = category
 
@@ -419,7 +419,6 @@ local function CreateOptionsPanel()
     return panel, category
 end
 
--- The slash command either opens settings or triggers a local test notification.
 local function SlashCommandHandler(msg)
     if not db then
         db = addon.db
@@ -431,7 +430,7 @@ local function SlashCommandHandler(msg)
         addon.PlayNotificationSound()
         addon.ShowNotification(db.orderMessage)
         addon.ShowChatNotification(db.orderMessage)
-        print("|cff00ff00" .. ADDON_TITLE .. ":|r Testing order notification")
+        print(string.format(L["CHAT_PREFIX"], ADDON_TITLE, L["MSG_TESTING"]))
     elseif addon.settingsCategory then
         Settings.OpenToCategory(addon.settingsCategory:GetID())
     end
