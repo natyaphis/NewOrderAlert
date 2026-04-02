@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.1.2
+
+- Updated localization text across supported locales.
+- Updated addon version metadata.
+
 ## 1.1.1
 
 - Updated addon version metadata.

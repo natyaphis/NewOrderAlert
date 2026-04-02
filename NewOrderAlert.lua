@@ -35,6 +35,15 @@ addon.SOUND_LIST = {
     { label = "Crash", fileDataID = 1716534 },
 }
 
+addon.FONT_OUTLINE_OPTIONS = {
+    { value = "", label = L["FONT_OUTLINE_NONE"] },
+    { value = "OUTLINE", label = L["FONT_OUTLINE"] },
+    { value = "THICKOUTLINE", label = L["FONT_OUTLINE_THICK"] },
+    { value = "MONOCHROME", label = L["FONT_OUTLINE_MONOCHROME"] },
+    { value = "OUTLINE,MONOCHROME", label = L["FONT_OUTLINE_MONOCHROME_OUTLINE"] },
+    { value = "THICKOUTLINE,MONOCHROME", label = L["FONT_OUTLINE_MONOCHROME_THICK"] },
+}
+
 local DEFAULTS = {
     soundEnabled = true,
     soundIndex = 3,
@@ -43,6 +52,7 @@ local DEFAULTS = {
     textEnabled = true,
     fontSize = 35,
     fontKey = "Friz Quadrata",
+    fontOutline = "",
     textColor = { r = 0.53, g = 0.81, b = 0.92 },
     textOffsetX = 0,
     textOffsetY = 300,
@@ -130,7 +140,7 @@ local function GetNotificationFont()
     local _, _, fontFlags = GameFontNormalLarge:GetFont()
     local selectedPath = addon.FONT_LOOKUP and addon.FONT_LOOKUP[db.fontKey] and addon.FONT_LOOKUP[db.fontKey].path
 
-    return selectedPath or "Fonts\\FRIZQT__.TTF", fontFlags
+    return selectedPath or "Fonts\\FRIZQT__.TTF", db.fontOutline ~= "" and db.fontOutline or fontFlags
 end
 
 local function MessageContainsAll(message, parts)
@@ -325,7 +335,7 @@ local function ApplyBackgroundSoundSetting()
     end
 end
 
-local function OnSystemMessage(self, event, message, ...)
+local function OnSystemMessage(message)
     if not IsPersonalOrderMessage(message) then
         return
     end
@@ -360,8 +370,6 @@ local function OnLogin()
     db.suppressInInstance = nil
     if db.fontKey == "Frizqt" then db.fontKey = "Friz Quadrata" end
     if db.fontKey == "Arial" then db.fontKey = "Arial Narrow" end
-    if db.fontKey == "Morpheus" then db.fontKey = "Morpheus" end
-    if db.fontKey == "Skurri" then db.fontKey = "Skurri" end
 
     for key, value in pairs(DEFAULTS) do
         if db[key] == nil then
@@ -417,6 +425,6 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "PLAYER_LOGIN" then
         OnLogin()
     elseif event == "CHAT_MSG_SYSTEM" then
-        OnSystemMessage(self, event, ...)
+        OnSystemMessage(...)
     end
 end)

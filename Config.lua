@@ -1,7 +1,6 @@
-local addonName, addon = ...
+local _, addon = ...
 local L = addon.L
 local ADDON_TITLE = L["ADDON_TITLE"]
-local VERSION = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addonName, "Version") or "unknown"
 
 local db
 local isElvUISkinned
@@ -16,6 +15,7 @@ local SECTION_CONTENT_OFFSET = 10
 local LABEL_WIDTH = 180
 local CONTROL_X_OFFSET = 190
 local CONTROL_WIDTH = 220
+local SLIDER_WIDTH_OFFSET = 45
 local DEFAULT_EDITBOX_HEIGHT = 20
 local BUTTON_HEIGHT = 24
 local INLINE_BUTTON_WIDTH = 96
@@ -41,14 +41,11 @@ local function GetElvUISkinsModule()
     return E.GetModule and E:GetModule("Skins", true) or nil
 end
 
-local function CreateCheckbox(parent, label, tooltip)
+local function CreateCheckbox(parent, label)
     local check = CreateFrame("CheckButton", nil, parent, "InterfaceOptionsCheckButtonTemplate")
     check.Text:SetText(label)
     ApplySettingLabelStyle(check.Text)
     check:SetEnabled(true)
-    if tooltip then
-        check.tooltipText = tooltip
-    end
     return check
 end
 
@@ -65,11 +62,10 @@ local function CreateSlider(parent, label, minVal, maxVal, step)
     return slider
 end
 
-local function CreateDropdown(parent, label, width)
+local function CreateDropdown(parent, width)
     local dropdown = CreateFrame("Frame", nil, parent, "UIDropDownMenuTemplate")
     dropdown.noResize = true
     dropdown.width = width
-    dropdown.labelText = label
 
     return dropdown
 end
@@ -182,7 +178,7 @@ end
 local function AnchorSlider(widget, anchor, width)
     widget:ClearAllPoints()
     widget:SetPoint("LEFT", anchor, "LEFT", CONTROL_X_OFFSET, 0)
-    widget:SetWidth(width)
+    widget:SetWidth(width + SLIDER_WIDTH_OFFSET)
     if widget.Text then
         widget.Text:ClearAllPoints()
         widget.Text:SetPoint("LEFT", anchor, "LEFT", 0, 0)
@@ -195,13 +191,6 @@ local function SetDropdownWidth(dropdown, width)
     UIDropDownMenu_SetWidth(dropdown, width)
     UIDropDownMenu_SetButtonWidth(dropdown, math.max(width - 24, 1))
     UIDropDownMenu_JustifyText(dropdown, "LEFT")
-
-    local button = dropdown.Button or _G[dropdown:GetName() and (dropdown:GetName() .. "Button") or ""]
-    if button then
-        button:SetScript("OnClick", function()
-            ToggleDropDownMenu(1, nil, dropdown)
-        end)
-    end
 
     local text = dropdown.Text or _G[dropdown:GetName() and (dropdown:GetName() .. "Text") or ""]
     if text then
@@ -223,7 +212,7 @@ local function ApplyDropdownPreviewFont(dropdown, fontPath)
         return
     end
 
-    local fallbackPath, fallbackSize, fallbackFlags = GameFontHighlightSmall:GetFont()
+    local fallbackPath, _, fallbackFlags = GameFontHighlightSmall:GetFont()
     text:SetFont(fontPath or fallbackPath, DROPDOWN_PREVIEW_SIZE, fallbackFlags)
 end
 
@@ -234,32 +223,39 @@ local function SetDropdownSelection(dropdown, value, text, fontPath)
 end
 
 local function BindDropdown(dropdown, items, getValue, setValue)
-    UIDropDownMenu_Initialize(dropdown, function(self, level)
-        for _, item in ipairs(items()) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text = item.text
-            info.value = item.value
-            info.notCheckable = true
-            info.func = function()
-                setValue(item.value, item.text, item)
-                SetDropdownSelection(dropdown, item.value, item.text, item.fontPath)
+    dropdown.itemsProvider = items
+    dropdown.getValue = getValue
+    dropdown.setValue = setValue
+
+    if not dropdown.isInitialized then
+        UIDropDownMenu_Initialize(dropdown, function(_, level)
+            for _, item in ipairs(dropdown.itemsProvider()) do
+                local info = UIDropDownMenu_CreateInfo()
+                info.text = item.text
+                info.value = item.value
+                info.notCheckable = true
+                info.func = function()
+                    dropdown.setValue(item.value, item.text, item)
+                    SetDropdownSelection(dropdown, item.value, item.text, item.fontPath)
+                end
+                UIDropDownMenu_AddButton(info)
+
+                local menuLevel = level or UIDROPDOWNMENU_MENU_LEVEL or 1
+                local listFrame = _G["DropDownList" .. menuLevel]
+                local button = listFrame and _G[listFrame:GetName() .. "Button" .. listFrame.numButtons]
+                local buttonText = button and button.NormalText
+                if buttonText then
+                    local fallbackPath, _, fallbackFlags = GameFontHighlightSmall:GetFont()
+                    buttonText:SetFont(item.fontPath or fallbackPath, DROPDOWN_PREVIEW_SIZE, fallbackFlags)
+                end
             end
-            UIDropDownMenu_AddButton(info)
+        end)
 
-            local menuLevel = level or UIDROPDOWNMENU_MENU_LEVEL or 1
-            local listFrame = _G["DropDownList" .. menuLevel]
-            local button = listFrame and _G[listFrame:GetName() .. "Button" .. listFrame.numButtons]
-            local buttonText = button and button.NormalText
-            if buttonText then
-                local fallbackPath, _, fallbackFlags = GameFontHighlightSmall:GetFont()
-                buttonText:SetFont(item.fontPath or fallbackPath, DROPDOWN_PREVIEW_SIZE, fallbackFlags)
-            end
-        end
-    end)
+        SetDropdownWidth(dropdown, dropdown.width)
+        dropdown.isInitialized = true
+    end
 
-    SetDropdownWidth(dropdown, dropdown.width)
-
-    local value, text, fontPath = getValue()
+    local value, text, fontPath = dropdown.getValue()
     SetDropdownSelection(dropdown, value, text, fontPath)
 end
 
@@ -271,7 +267,7 @@ local function CreateInlineButton(parent, text)
     return button
 end
 
-local function CreateCheckboxRow(parent, section, widgets, options)
+local function CreateCheckboxRow(section, widgets, options)
     local row = section:AddRow(28)
     local checkbox = CreateCheckbox(row, options.label)
     AnchorCheckbox(checkbox, row)
@@ -295,10 +291,10 @@ local function CreateCheckboxRow(parent, section, widgets, options)
     }
 end
 
-local function CreateDropdownRow(parent, section, widgets, label, width)
+local function CreateDropdownRow(section, widgets, label, width)
     local row = section:AddRow(32)
     CreateRowLabel(row, row, label)
-    local dropdown = CreateDropdown(row, label, width)
+    local dropdown = CreateDropdown(row, width)
     AnchorDropdown(dropdown, row)
     table.insert(widgets.dropdowns, dropdown)
 
@@ -308,7 +304,7 @@ local function CreateDropdownRow(parent, section, widgets, label, width)
     }
 end
 
-local function CreateSliderRow(parent, section, widgets, label, minValue, maxValue, step)
+local function CreateSliderRow(section, widgets, label, minValue, maxValue, step)
     local row = section:AddRow(32)
     local slider = CreateSlider(row, label, minValue, maxValue, step)
     AnchorSlider(slider, row, CONTROL_WIDTH)
@@ -320,7 +316,7 @@ local function CreateSliderRow(parent, section, widgets, label, minValue, maxVal
     }
 end
 
-local function CreateColorPickerRow(parent, section, widgets, label)
+local function CreateColorPickerRow(section, widgets, label)
     local row = section:AddRow(28)
     local colorPicker = CreateColorPicker(row, label)
     colorPicker:SetPoint("LEFT", row, "LEFT", CONTROL_X_OFFSET, 0)
@@ -334,7 +330,7 @@ local function CreateColorPickerRow(parent, section, widgets, label)
     }
 end
 
-local function CreateMessageRow(parent, section, widgets)
+local function CreateMessageRow(section, widgets)
     local row = section:AddRow(48)
     local label = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     label:SetPoint("LEFT", row, "LEFT", 0, 0)
@@ -452,7 +448,7 @@ local function CreateOptionsPanel()
     local sections = {}
 
     sections.sound = CreateSection(scrollChild)
-    controls.enableSound = CreateCheckboxRow(scrollChild, sections.sound, widgets, {
+    controls.enableSound = CreateCheckboxRow(sections.sound, widgets, {
         label = L["ENABLE_SOUND"],
         onClick = function(self)
             db.soundEnabled = self:GetChecked()
@@ -463,19 +459,19 @@ local function CreateOptionsPanel()
             addon.ShowNotification(db.orderMessage)
         end,
     })
-    controls.playInBackground = CreateCheckboxRow(scrollChild, sections.sound, widgets, {
+    controls.playInBackground = CreateCheckboxRow(sections.sound, widgets, {
         label = L["PLAY_IN_BACKGROUND"],
         onClick = function(self)
             db.playInBackground = self:GetChecked()
             addon.ApplyBackgroundSoundSetting()
         end,
     })
-    controls.soundDropdown = CreateDropdownRow(scrollChild, sections.sound, widgets, L["SOUND"], CONTROL_WIDTH)
-    controls.channelDropdown = CreateDropdownRow(scrollChild, sections.sound, widgets, L["CHANNEL"], CONTROL_WIDTH)
+    controls.soundDropdown = CreateDropdownRow(sections.sound, widgets, L["SOUND"], CONTROL_WIDTH)
+    controls.channelDropdown = CreateDropdownRow(sections.sound, widgets, L["CHANNEL"], CONTROL_WIDTH)
     sections.sound:Finalize()
 
     sections.display = CreateSection(scrollChild, sections.sound)
-    controls.enableText = CreateCheckboxRow(scrollChild, sections.display, widgets, {
+    controls.enableText = CreateCheckboxRow(sections.display, widgets, {
         label = L["ENABLE_TEXT"],
         onClick = function(self)
             db.textEnabled = self:GetChecked()
@@ -488,47 +484,48 @@ local function CreateOptionsPanel()
             addon.ToggleTestNotification()
         end,
     })
-    controls.colorPicker = CreateColorPickerRow(scrollChild, sections.display, widgets, L["FONT_COLOR"])
-    controls.fontDropdown = CreateDropdownRow(scrollChild, sections.display, widgets, L["FONT_FACE"], CONTROL_WIDTH)
-    controls.fontSize = CreateSliderRow(scrollChild, sections.display, widgets, L["SCALE"], 5, 100, 1)
-    controls.duration = CreateSliderRow(scrollChild, sections.display, widgets, L["DISPLAY_DURATION"], 2, 10, 1)
-    controls.xOffset = CreateSliderRow(scrollChild, sections.display, widgets, L["X_POSITION"], -1000, 1000, 5)
-    controls.yOffset = CreateSliderRow(scrollChild, sections.display, widgets, L["Y_POSITION"], -500, 500, 5)
-    controls.message = CreateMessageRow(scrollChild, sections.display, widgets)
+    controls.colorPicker = CreateColorPickerRow(sections.display, widgets, L["FONT_COLOR"])
+    controls.fontDropdown = CreateDropdownRow(sections.display, widgets, L["FONT_FACE"], CONTROL_WIDTH)
+    controls.fontOutlineDropdown = CreateDropdownRow(sections.display, widgets, L["FONT_OUTLINE_STYLE"], CONTROL_WIDTH)
+    controls.fontSize = CreateSliderRow(sections.display, widgets, L["SCALE"], 5, 100, 1)
+    controls.duration = CreateSliderRow(sections.display, widgets, L["DISPLAY_DURATION"], 2, 10, 1)
+    controls.xOffset = CreateSliderRow(sections.display, widgets, L["X_POSITION"], -1000, 1000, 5)
+    controls.yOffset = CreateSliderRow(sections.display, widgets, L["Y_POSITION"], -500, 500, 5)
+    controls.message = CreateMessageRow(sections.display, widgets)
     sections.display:Finalize()
 
     sections.suppression = CreateSection(scrollChild, sections.display)
-    controls.suppressCombat = CreateCheckboxRow(scrollChild, sections.suppression, widgets, {
+    controls.suppressCombat = CreateCheckboxRow(sections.suppression, widgets, {
         label = L["SUPPRESS_COMBAT"],
         onClick = function(self)
             db.suppressInCombat = self:GetChecked()
         end,
     })
-    controls.suppressMythicPlus = CreateCheckboxRow(scrollChild, sections.suppression, widgets, {
+    controls.suppressMythicPlus = CreateCheckboxRow(sections.suppression, widgets, {
         label = L["SUPPRESS_MYTHIC_PLUS"],
         onClick = function(self)
             db.suppressInMythicPlus = self:GetChecked()
         end,
     })
-    controls.suppressRaid = CreateCheckboxRow(scrollChild, sections.suppression, widgets, {
+    controls.suppressRaid = CreateCheckboxRow(sections.suppression, widgets, {
         label = L["SUPPRESS_RAID"],
         onClick = function(self)
             db.suppressInRaid = self:GetChecked()
         end,
     })
-    controls.suppressArena = CreateCheckboxRow(scrollChild, sections.suppression, widgets, {
+    controls.suppressArena = CreateCheckboxRow(sections.suppression, widgets, {
         label = L["SUPPRESS_ARENA"],
         onClick = function(self)
             db.suppressInArena = self:GetChecked()
         end,
     })
-    controls.suppressBattleground = CreateCheckboxRow(scrollChild, sections.suppression, widgets, {
+    controls.suppressBattleground = CreateCheckboxRow(sections.suppression, widgets, {
         label = L["SUPPRESS_BATTLEGROUND"],
         onClick = function(self)
             db.suppressInBattleground = self:GetChecked()
         end,
     })
-    controls.restAreaOnly = CreateCheckboxRow(scrollChild, sections.suppression, widgets, {
+    controls.restAreaOnly = CreateCheckboxRow(sections.suppression, widgets, {
         label = L["REST_AREA_ONLY"],
         onClick = function(self)
             db.restAreaOnly = self:GetChecked()
@@ -583,41 +580,74 @@ local function CreateOptionsPanel()
         return items
     end
 
-    BindDropdown(
-        controls.soundDropdown.dropdown,
-        GetSoundItems,
-        function()
-            local selected = addon.SOUND_LIST and addon.SOUND_LIST[db.soundIndex]
-            return db.soundIndex, selected and selected.label or ""
-        end,
-        function(value)
-            db.soundIndex = value
+    local function GetFontOutlineItems()
+        local items = {}
+        for _, outlineOption in ipairs(addon.FONT_OUTLINE_OPTIONS or {}) do
+            items[#items + 1] = {
+                value = outlineOption.value,
+                text = outlineOption.label,
+            }
         end
-    )
+        return items
+    end
 
-    BindDropdown(
-        controls.channelDropdown.dropdown,
-        GetChannelItems,
-        function()
-            return db.soundChannel, db.soundChannel
-        end,
-        function(value)
-            db.soundChannel = value
-        end
-    )
+    local function BindAllDropdowns()
+        BindDropdown(
+            controls.soundDropdown.dropdown,
+            GetSoundItems,
+            function()
+                local selected = addon.SOUND_LIST and addon.SOUND_LIST[db.soundIndex]
+                return db.soundIndex, selected and selected.label or ""
+            end,
+            function(value)
+                db.soundIndex = value
+            end
+        )
 
-    BindDropdown(
-        controls.fontDropdown.dropdown,
-        GetFontItems,
-        function()
-            local selected = addon.FONT_LOOKUP and addon.FONT_LOOKUP[db.fontKey]
-            return db.fontKey, selected and selected.label or db.fontKey, selected and selected.path or nil
-        end,
-        function(value)
-            db.fontKey = value
-            addon.UpdateNotificationFrameFont()
-        end
-    )
+        BindDropdown(
+            controls.channelDropdown.dropdown,
+            GetChannelItems,
+            function()
+                return db.soundChannel, db.soundChannel
+            end,
+            function(value)
+                db.soundChannel = value
+            end
+        )
+
+        BindDropdown(
+            controls.fontDropdown.dropdown,
+            GetFontItems,
+            function()
+                local selected = addon.FONT_LOOKUP and addon.FONT_LOOKUP[db.fontKey]
+                return db.fontKey, selected and selected.label or db.fontKey, selected and selected.path or nil
+            end,
+            function(value)
+                db.fontKey = value
+                addon.UpdateNotificationFrameFont()
+            end
+        )
+
+        BindDropdown(
+            controls.fontOutlineDropdown.dropdown,
+            GetFontOutlineItems,
+            function()
+                local selectedValue = db.fontOutline or ""
+                for _, item in ipairs(addon.FONT_OUTLINE_OPTIONS or {}) do
+                    if item.value == selectedValue then
+                        return selectedValue, item.label
+                    end
+                end
+                return selectedValue, L["FONT_OUTLINE_NONE"]
+            end,
+            function(value)
+                db.fontOutline = value
+                addon.UpdateNotificationFrameFont()
+            end
+        )
+    end
+
+    BindAllDropdowns()
 
     controls.fontSize.slider:SetScript("OnValueChanged", function(self, value)
         db.fontSize = value
@@ -700,41 +730,7 @@ local function CreateOptionsPanel()
         controls.suppressBattleground.checkbox:SetChecked(db.suppressInBattleground)
         controls.restAreaOnly.checkbox:SetChecked(db.restAreaOnly)
 
-        BindDropdown(
-            controls.soundDropdown.dropdown,
-            GetSoundItems,
-            function()
-                local selected = addon.SOUND_LIST and addon.SOUND_LIST[db.soundIndex]
-                return db.soundIndex, selected and selected.label or ""
-            end,
-            function(value)
-                db.soundIndex = value
-            end
-        )
-
-        BindDropdown(
-            controls.channelDropdown.dropdown,
-            GetChannelItems,
-            function()
-                return db.soundChannel, db.soundChannel
-            end,
-            function(value)
-                db.soundChannel = value
-            end
-        )
-
-        BindDropdown(
-            controls.fontDropdown.dropdown,
-            GetFontItems,
-            function()
-                local selected = addon.FONT_LOOKUP and addon.FONT_LOOKUP[db.fontKey]
-                return db.fontKey, selected and selected.label or db.fontKey, selected and selected.path or nil
-            end,
-            function(value)
-                db.fontKey = value
-                addon.UpdateNotificationFrameFont()
-            end
-        )
+        BindAllDropdowns()
 
         controls.fontSize.slider:SetValue(db.fontSize)
         controls.fontSize.slider.Text:SetText(string.format(L["SCALE_FORMAT"], db.fontSize))
