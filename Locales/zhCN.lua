@@ -12,7 +12,7 @@ L["PANEL_SUBTITLE"] = "|cffaaaaaa作者 %s  •  v%s|r"
 L["CHAT_PREFIX"] = "|cff00ff00%s:|r %s"
 L["MSG_SAVED"] = "提醒文本已保存。"
 L["MSG_TESTING"] = "正在测试订单提醒"
-L["DEFAULT_ORDER_MESSAGE"] = "新的个人制造订单！"
+L["DEFAULT_ORDER_MESSAGE"] = "<New Order!>"
 
 L["ENABLE_SOUND"] = "启用声音提醒"
 L["PLAY_IN_BACKGROUND"] = "游戏后台时播放"

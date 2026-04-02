@@ -193,6 +193,15 @@ local function SetDropdownWidth(dropdown, width)
     UIDropDownMenu_SetWidth(dropdown, width)
     UIDropDownMenu_SetButtonWidth(dropdown, math.max(width - 24, 1))
     UIDropDownMenu_JustifyText(dropdown, "LEFT")
+
+    local text = dropdown.Text or _G[dropdown:GetName() and (dropdown:GetName() .. "Text") or ""]
+    if text then
+        text:ClearAllPoints()
+        text:SetPoint("LEFT", dropdown, "LEFT", 16, 0)
+        text:SetPoint("RIGHT", dropdown, "RIGHT", -32, 0)
+        text:SetJustifyH("LEFT")
+        text:SetJustifyV("MIDDLE")
+    end
 end
 
 local function ApplyElvUISkin(widgets)

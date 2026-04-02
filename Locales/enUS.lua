@@ -8,7 +8,7 @@ L["PANEL_SUBTITLE"] = "|cffaaaaaaby %s  •  v%s|r"
 L["CHAT_PREFIX"] = "|cff00ff00%s:|r %s"
 L["MSG_SAVED"] = "Message saved."
 L["MSG_TESTING"] = "Testing order notification"
-L["DEFAULT_ORDER_MESSAGE"] = "New Personal Crafting Order!"
+L["DEFAULT_ORDER_MESSAGE"] = "<New Order!>"
 
 L["ENABLE_SOUND"] = "Enable Sound Notifications"
 L["PLAY_IN_BACKGROUND"] = "Play in Background"
