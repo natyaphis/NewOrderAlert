@@ -12,15 +12,19 @@ local DEFAULTS = {
     soundChannel = "Master",
     playInBackground = true,
     textEnabled = true,
-    fontSize = 32,
+    fontSize = 30,
     fontKey = "Friz Quadrata",
     textColor = { r = 1, g = 1, b = 0 },
     textOffsetX = 0,
-    textOffsetY = 200,
-    displayDuration = 3,
+    textOffsetY = 300,
+    displayDuration = 2,
     orderMessage = L["DEFAULT_ORDER_MESSAGE"],
-    suppressInCombat = true,
-    suppressInInstance = true,
+    suppressInCombat = false,
+    suppressInMythicPlus = false,
+    suppressInRaid = false,
+    suppressInArena = false,
+    suppressInBattleground = false,
+    restAreaOnly = true,
 }
 
 local db
@@ -128,15 +132,33 @@ local function CanNotify()
 end
 
 local function IsSuppressed()
+    if db.restAreaOnly and not IsResting() then
+        return true
+    end
+
     if db.suppressInCombat and UnitAffectingCombat("player") then
         return true
     end
 
-    if db.suppressInInstance then
-        local inInstance, instanceType = IsInInstance()
-        if inInstance and instanceType ~= "none" then
-            return true
-        end
+    local inInstance, instanceType = IsInInstance()
+    if not inInstance then
+        return false
+    end
+
+    if db.suppressInArena and instanceType == "arena" then
+        return true
+    end
+
+    if db.suppressInBattleground and instanceType == "pvp" then
+        return true
+    end
+
+    if db.suppressInRaid and instanceType == "raid" then
+        return true
+    end
+
+    if db.suppressInMythicPlus and instanceType == "party" then
+        return true
     end
 
     return false
@@ -306,6 +328,7 @@ local function OnLogin()
     end
     db.textScale = nil
     db.chatEnabled = nil
+    db.suppressInInstance = nil
     if db.fontKey == "Frizqt" then db.fontKey = "Friz Quadrata" end
     if db.fontKey == "Arial" then db.fontKey = "Arial Narrow" end
     if db.fontKey == "Morpheus" then db.fontKey = "Morpheus" end

@@ -18,6 +18,7 @@ local CONTROL_WIDTH = 220
 local DEFAULT_EDITBOX_HEIGHT = 20
 local BUTTON_HEIGHT = 24
 local INLINE_BUTTON_WIDTH = 96
+local DROPDOWN_PREVIEW_SIZE = 12
 
 local function ApplySettingLabelStyle(fontString)
     if not fontString then
@@ -204,9 +205,24 @@ local function SetDropdownWidth(dropdown, width)
     end
 end
 
-local function SetDropdownSelection(dropdown, value, text)
+local function GetDropdownText(dropdown)
+    return dropdown.Text or _G[dropdown:GetName() and (dropdown:GetName() .. "Text") or ""]
+end
+
+local function ApplyDropdownPreviewFont(dropdown, fontPath)
+    local text = GetDropdownText(dropdown)
+    if not text then
+        return
+    end
+
+    local fallbackPath, fallbackSize, fallbackFlags = GameFontHighlightSmall:GetFont()
+    text:SetFont(fontPath or fallbackPath, DROPDOWN_PREVIEW_SIZE, fallbackFlags)
+end
+
+local function SetDropdownSelection(dropdown, value, text, fontPath)
     UIDropDownMenu_SetSelectedValue(dropdown, value)
     UIDropDownMenu_SetText(dropdown, text or "")
+    ApplyDropdownPreviewFont(dropdown, fontPath)
 end
 
 local function BindDropdown(dropdown, items, getValue, setValue)
@@ -217,17 +233,25 @@ local function BindDropdown(dropdown, items, getValue, setValue)
             info.value = item.value
             info.notCheckable = true
             info.func = function()
-                setValue(item.value, item.text)
-                SetDropdownSelection(dropdown, item.value, item.text)
+                setValue(item.value, item.text, item)
+                SetDropdownSelection(dropdown, item.value, item.text, item.fontPath)
             end
             UIDropDownMenu_AddButton(info)
+
+            local listFrame = _G["DropDownList" .. level]
+            local button = listFrame and _G[listFrame:GetName() .. "Button" .. listFrame.numButtons]
+            local buttonText = button and button.NormalText
+            if buttonText then
+                local fallbackPath, _, fallbackFlags = GameFontHighlightSmall:GetFont()
+                buttonText:SetFont(item.fontPath or fallbackPath, DROPDOWN_PREVIEW_SIZE, fallbackFlags)
+            end
         end
     end)
 
     SetDropdownWidth(dropdown, dropdown.width)
 
-    local value, text = getValue()
-    SetDropdownSelection(dropdown, value, text)
+    local value, text, fontPath = getValue()
+    SetDropdownSelection(dropdown, value, text, fontPath)
 end
 
 local function CreateInlineButton(parent, text)
@@ -240,14 +264,14 @@ end
 
 local function CreateCheckboxRow(parent, section, widgets, options)
     local row = section:AddRow(28)
-    local checkbox = CreateCheckbox(parent, options.label)
+    local checkbox = CreateCheckbox(row, options.label)
     AnchorCheckbox(checkbox, row)
     checkbox:SetScript("OnClick", options.onClick)
     table.insert(widgets.checkboxes, checkbox)
 
     local button
     if options.buttonText then
-        button = CreateInlineButton(parent, options.buttonText)
+        button = CreateInlineButton(row, options.buttonText)
         button:SetPoint("RIGHT", row, "RIGHT", 0, 0)
         if options.buttonOnClick then
             button:SetScript("OnClick", options.buttonOnClick)
@@ -264,8 +288,8 @@ end
 
 local function CreateDropdownRow(parent, section, widgets, label, width)
     local row = section:AddRow(32)
-    CreateRowLabel(parent, row, label)
-    local dropdown = CreateDropdown(parent, label, width)
+    CreateRowLabel(row, row, label)
+    local dropdown = CreateDropdown(row, label, width)
     AnchorDropdown(dropdown, row)
     table.insert(widgets.dropdowns, dropdown)
 
@@ -277,7 +301,7 @@ end
 
 local function CreateSliderRow(parent, section, widgets, label, minValue, maxValue, step)
     local row = section:AddRow(32)
-    local slider = CreateSlider(parent, label, minValue, maxValue, step)
+    local slider = CreateSlider(row, label, minValue, maxValue, step)
     AnchorSlider(slider, row, CONTROL_WIDTH)
     table.insert(widgets.sliders, slider)
 
@@ -289,7 +313,7 @@ end
 
 local function CreateColorPickerRow(parent, section, widgets, label)
     local row = section:AddRow(28)
-    local colorPicker = CreateColorPicker(parent, label)
+    local colorPicker = CreateColorPicker(row, label)
     colorPicker:SetPoint("LEFT", row, "LEFT", CONTROL_X_OFFSET, 0)
     colorPicker.label:ClearAllPoints()
     colorPicker.label:SetPoint("LEFT", row, "LEFT", 0, 0)
@@ -303,18 +327,18 @@ end
 
 local function CreateMessageRow(parent, section, widgets)
     local row = section:AddRow(48)
-    local label = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local label = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     label:SetPoint("LEFT", row, "LEFT", 0, 0)
     label:SetWidth(LABEL_WIDTH - 8)
     label:SetText(L["NOTIFICATION_MESSAGE"])
     ApplySettingLabelStyle(label)
 
-    local editBox = CreateEditBox(parent, 360)
+    local editBox = CreateEditBox(row, 360)
     editBox:SetPoint("LEFT", row, "LEFT", CONTROL_X_OFFSET, 0)
     editBox:SetSize(CONTENT_WIDTH - CONTROL_X_OFFSET - INLINE_BUTTON_WIDTH - 8, DEFAULT_EDITBOX_HEIGHT)
     table.insert(widgets.editBoxes, editBox)
 
-    local button = CreateInlineButton(parent, L["SAVE"])
+    local button = CreateInlineButton(row, L["SAVE"])
     button:SetPoint("RIGHT", row, "RIGHT", 0, 0)
     table.insert(widgets.buttons, button)
 
@@ -467,10 +491,34 @@ local function CreateOptionsPanel()
             db.suppressInCombat = self:GetChecked()
         end,
     })
-    controls.suppressInstance = CreateCheckboxRow(scrollChild, sections.suppression, widgets, {
-        label = L["SUPPRESS_INSTANCE"],
+    controls.suppressMythicPlus = CreateCheckboxRow(scrollChild, sections.suppression, widgets, {
+        label = L["SUPPRESS_MYTHIC_PLUS"],
         onClick = function(self)
-            db.suppressInInstance = self:GetChecked()
+            db.suppressInMythicPlus = self:GetChecked()
+        end,
+    })
+    controls.suppressRaid = CreateCheckboxRow(scrollChild, sections.suppression, widgets, {
+        label = L["SUPPRESS_RAID"],
+        onClick = function(self)
+            db.suppressInRaid = self:GetChecked()
+        end,
+    })
+    controls.suppressArena = CreateCheckboxRow(scrollChild, sections.suppression, widgets, {
+        label = L["SUPPRESS_ARENA"],
+        onClick = function(self)
+            db.suppressInArena = self:GetChecked()
+        end,
+    })
+    controls.suppressBattleground = CreateCheckboxRow(scrollChild, sections.suppression, widgets, {
+        label = L["SUPPRESS_BATTLEGROUND"],
+        onClick = function(self)
+            db.suppressInBattleground = self:GetChecked()
+        end,
+    })
+    controls.restAreaOnly = CreateCheckboxRow(scrollChild, sections.suppression, widgets, {
+        label = L["REST_AREA_ONLY"],
+        onClick = function(self)
+            db.restAreaOnly = self:GetChecked()
         end,
     })
     sections.suppression:Finalize()
@@ -516,6 +564,7 @@ local function CreateOptionsPanel()
             items[#items + 1] = {
                 value = fontOption.key,
                 text = fontOption.label,
+                fontPath = fontOption.path,
             }
         end
         return items
@@ -549,7 +598,7 @@ local function CreateOptionsPanel()
         GetFontItems,
         function()
             local selected = addon.FONT_LOOKUP and addon.FONT_LOOKUP[db.fontKey]
-            return db.fontKey, selected and selected.label or db.fontKey
+            return db.fontKey, selected and selected.label or db.fontKey, selected and selected.path or nil
         end,
         function(value)
             db.fontKey = value
@@ -632,7 +681,11 @@ local function CreateOptionsPanel()
         controls.playInBackground.checkbox:SetChecked(db.playInBackground)
         controls.enableText.checkbox:SetChecked(db.textEnabled)
         controls.suppressCombat.checkbox:SetChecked(db.suppressInCombat)
-        controls.suppressInstance.checkbox:SetChecked(db.suppressInInstance)
+        controls.suppressMythicPlus.checkbox:SetChecked(db.suppressInMythicPlus)
+        controls.suppressRaid.checkbox:SetChecked(db.suppressInRaid)
+        controls.suppressArena.checkbox:SetChecked(db.suppressInArena)
+        controls.suppressBattleground.checkbox:SetChecked(db.suppressInBattleground)
+        controls.restAreaOnly.checkbox:SetChecked(db.restAreaOnly)
 
         BindDropdown(
             controls.soundDropdown.dropdown,
@@ -662,7 +715,7 @@ local function CreateOptionsPanel()
             GetFontItems,
             function()
                 local selected = addon.FONT_LOOKUP and addon.FONT_LOOKUP[db.fontKey]
-                return db.fontKey, selected and selected.label or db.fontKey
+                return db.fontKey, selected and selected.label or db.fontKey, selected and selected.path or nil
             end,
             function(value)
                 db.fontKey = value

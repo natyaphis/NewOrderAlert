@@ -1,7 +1,7 @@
 ## Interface: 120000,120001
 ## Title: NewOrderAlert
 ## Author: NatYaphis
-## Version: 1.0.8
+## Version: 1.0.9
 ## Notes: Notifies crafters when they receive Personal Crafting Orders with customizable sound and visual alerts.
 ## Notes-zhCN: 在收到新的个人制造订单时提供可自定义声音和视觉提醒。
 ## SavedVariables: NewOrderAlertDB
