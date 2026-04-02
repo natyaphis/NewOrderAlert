@@ -359,7 +359,7 @@ local function CreateOptionsPanel()
     table.insert(widgets.sliders, durationSlider)
 
     local displayRow6 = displaySection:AddRow(32)
-    local xOffsetSlider = CreateSlider(scrollChild, L["X_POSITION"], -960, 960, 5)
+    local xOffsetSlider = CreateSlider(scrollChild, L["X_POSITION"], -1000, 1000, 5)
     AnchorSlider(xOffsetSlider, displayRow6, CONTROL_WIDTH)
     table.insert(widgets.sliders, xOffsetSlider)
 
