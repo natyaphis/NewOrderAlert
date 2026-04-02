@@ -13,7 +13,7 @@ local DEFAULTS = {
     playInBackground = true,
     textEnabled = true,
     fontSize = 32,
-    fontKey = "Frizqt",
+    fontKey = "Friz Quadrata",
     textColor = { r = 1, g = 1, b = 0 },
     textOffsetX = 0,
     textOffsetY = 200,
@@ -26,9 +26,11 @@ local DEFAULTS = {
 local db
 local lastNotificationTime = 0
 local notificationFrame
-local isTestNotificationVisible
+local notificationController = {
+    mode = "hidden",
+}
 
-local function BuildFontOptions()
+local function CreateFontRegistry()
     local options = {}
     local lookup = {}
 
@@ -46,24 +48,42 @@ local function BuildFontOptions()
         lookup[label] = option
     end
 
-    AddFont("Friz Quadrata", "Fonts\\FRIZQT__.TTF")
-    AddFont("Arial Narrow", "Fonts\\ARIALN.TTF")
-    AddFont("Morpheus", "Fonts\\MORPHEUS.TTF")
-    AddFont("Skurri", "Fonts\\skurri.ttf")
+    return options, lookup, AddFont
+end
 
+local function CollectBuiltinFonts(addFont)
+    addFont("Friz Quadrata", "Fonts\\FRIZQT__.TTF")
+    addFont("Arial Narrow", "Fonts\\ARIALN.TTF")
+    addFont("Morpheus", "Fonts\\MORPHEUS.TTF")
+    addFont("Skurri", "Fonts\\skurri.ttf")
+end
+
+local function CollectSharedMediaFonts(addFont)
     local LSM = _G.LibStub and _G.LibStub("LibSharedMedia-3.0", true)
-    if LSM and LSM.HashTable then
-        local fonts = LSM:HashTable("font")
-        for name, path in pairs(fonts or {}) do
-            AddFont(name, path)
-        end
+    if not (LSM and LSM.HashTable) then
+        return
     end
 
+    local fonts = LSM:HashTable("font")
+    for name, path in pairs(fonts or {}) do
+        addFont(name, path)
+    end
+end
+
+local function CollectElvUIFonts(addFont)
     local E = _G.ElvUI and unpack(_G.ElvUI)
     if E and E.media then
-        AddFont("ElvUI Normal", E.media.normFont)
-        AddFont("ElvUI Combat", E.media.combatFont)
+        addFont("ElvUI Normal", E.media.normFont)
+        addFont("ElvUI Combat", E.media.combatFont)
     end
+end
+
+local function BuildFontOptions()
+    local options, lookup, addFont = CreateFontRegistry()
+
+    CollectBuiltinFonts(addFont)
+    CollectSharedMediaFonts(addFont)
+    CollectElvUIFonts(addFont)
 
     table.sort(options, function(a, b)
         return a.label < b.label
@@ -149,7 +169,7 @@ local function ShowNotification(message)
         return
     end
 
-    isTestNotificationVisible = false
+    notificationController.mode = "transient"
     frame.text:SetText(message)
     UIFrameFadeRemoveFrame(frame)
     frame:Show()
@@ -157,15 +177,16 @@ local function ShowNotification(message)
 
     local holdTime = math.max(db.displayDuration - 1.0, 1.0)
     C_Timer.After(0.5 + holdTime, function()
-        if isTestNotificationVisible then
+        if notificationController.mode ~= "transient" then
             return
         end
 
         UIFrameFadeOut(frame, 0.5, 1, 0)
         C_Timer.After(0.5, function()
-            if isTestNotificationVisible then
+            if notificationController.mode ~= "transient" then
                 return
             end
+            notificationController.mode = "hidden"
             frame:Hide()
         end)
     end)
@@ -176,7 +197,7 @@ local function HideNotification()
         return
     end
 
-    isTestNotificationVisible = false
+    notificationController.mode = "hidden"
     UIFrameFadeRemoveFrame(notificationFrame)
     notificationFrame:Hide()
 end
@@ -186,7 +207,7 @@ local function ShowTestNotification()
         return
     end
 
-    isTestNotificationVisible = true
+    notificationController.mode = "test"
     notificationFrame.text:SetText(db.orderMessage)
     UIFrameFadeRemoveFrame(notificationFrame)
     notificationFrame:SetAlpha(1)
@@ -194,7 +215,7 @@ local function ShowTestNotification()
 end
 
 local function ToggleTestNotification()
-    if isTestNotificationVisible then
+    if notificationController.mode == "test" then
         HideNotification()
         return false
     end
