@@ -4,10 +4,45 @@ local ADDON_TITLE = L["ADDON_TITLE"]
 local VERSION = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addonName, "Version") or "unknown"
 
 local db
+local isElvUISkinned
+
+local PANEL_WIDTH = 620
+local CONTENT_WIDTH = 588
+local PANEL_HEIGHT = 680
+local ROW_SPACING = 5
+local SECTION_SPACING = 10
+local SECTION_CONTENT_OFFSET = 10
+local LABEL_WIDTH = 180
+local CONTROL_X_OFFSET = 190
+local CONTROL_WIDTH = 220
+local DEFAULT_EDITBOX_HEIGHT = 20
+local BUTTON_HEIGHT = 24
+local INLINE_BUTTON_WIDTH = 96
+
+local function ApplySettingLabelStyle(fontString)
+    if not fontString then
+        return
+    end
+
+    fontString:SetFontObject("GameFontHighlight")
+    fontString:SetTextColor(1, 0.82, 0)
+    fontString:SetJustifyH("LEFT")
+end
+
+local function GetElvUISkinsModule()
+    local E = _G.ElvUI and unpack(_G.ElvUI)
+    local blizzardSkins = E and E.private and E.private.skins and E.private.skins.blizzard
+    if not blizzardSkins or not blizzardSkins.enable or blizzardSkins.blizzardOptions == false then
+        return
+    end
+
+    return E.GetModule and E:GetModule("Skins", true) or nil
+end
 
 local function CreateCheckbox(parent, label, tooltip)
     local check = CreateFrame("CheckButton", nil, parent, "InterfaceOptionsCheckButtonTemplate")
     check.Text:SetText(label)
+    ApplySettingLabelStyle(check.Text)
     check:SetEnabled(true)
     if tooltip then
         check.tooltipText = tooltip
@@ -30,18 +65,16 @@ end
 
 local function CreateDropdown(parent, label, width)
     local dropdown = CreateFrame("Frame", nil, parent, "UIDropDownMenuTemplate")
-
-    local labelText = dropdown:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    labelText:SetPoint("BOTTOMLEFT", dropdown, "TOPLEFT", 20, 3)
-    labelText:SetText(label)
-    dropdown.label = labelText
+    dropdown.noResize = true
+    dropdown.width = width
+    dropdown.labelText = label
 
     return dropdown
 end
 
 local function CreateEditBox(parent, width)
     local editbox = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
-    editbox:SetSize(width or 300, 20)
+    editbox:SetSize(width or 300, DEFAULT_EDITBOX_HEIGHT)
     editbox:SetAutoFocus(false)
     editbox:SetEnabled(true)
     editbox:SetFontObject("GameFontHighlight")
@@ -57,6 +90,7 @@ local function CreateColorPicker(parent, label)
     local border = button:CreateTexture(nil, "BORDER")
     border:SetAllPoints(button)
     border:SetColorTexture(0.3, 0.3, 0.3, 1)
+    button.border = border
 
     local texture = button:CreateTexture(nil, "ARTWORK")
     texture:SetPoint("TOPLEFT", 2, -2)
@@ -69,144 +103,305 @@ local function CreateColorPicker(parent, label)
     highlight:SetColorTexture(1, 1, 1, 0.3)
 
     local labelText = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    labelText:SetPoint("LEFT", button, "RIGHT", 8, 0)
+    labelText:SetPoint("RIGHT", button, "LEFT", -8, 0)
+    labelText:SetWidth(LABEL_WIDTH - 8)
     labelText:SetText(label)
+    ApplySettingLabelStyle(labelText)
     button.label = labelText
 
     return button
 end
 
+local function CreateSection(parent, title, anchor)
+    local section = CreateFrame("Frame", nil, parent)
+    section:SetWidth(PANEL_WIDTH)
+    if anchor then
+        section:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -SECTION_SPACING)
+    else
+        section:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, 0)
+    end
+
+    local dividerLeft = section:CreateTexture(nil, "ARTWORK")
+    dividerLeft:SetColorTexture(1, 1, 1, 1)
+    dividerLeft:SetGradient("HORIZONTAL",
+        CreateColor(1, 1, 1, 0.08),
+        CreateColor(1, 1, 1, 0.32)
+    )
+    dividerLeft:SetPoint("TOPLEFT", 10, 0)
+    dividerLeft:SetPoint("TOPRIGHT", section, "TOP", 0, 0)
+    dividerLeft:SetHeight(1)
+
+    local dividerRight = section:CreateTexture(nil, "ARTWORK")
+    dividerRight:SetColorTexture(1, 1, 1, 1)
+    dividerRight:SetGradient("HORIZONTAL",
+        CreateColor(1, 1, 1, 0.32),
+        CreateColor(1, 1, 1, 0.08)
+    )
+    dividerRight:SetPoint("TOPLEFT", section, "TOP", 0, 0)
+    dividerRight:SetPoint("TOPRIGHT", -22, 0)
+    dividerRight:SetHeight(1)
+
+    section.rowOffset = 0
+
+    function section:AddRow(rowHeight)
+        local row = CreateFrame("Frame", nil, self)
+        row:SetSize(CONTENT_WIDTH, rowHeight)
+        row:SetPoint("TOPLEFT", 16, -(SECTION_CONTENT_OFFSET + self.rowOffset))
+
+        self.rowOffset = self.rowOffset + rowHeight + ROW_SPACING
+        return row
+    end
+
+    function section:Finalize()
+        local contentHeight = math.max(0, self.rowOffset - ROW_SPACING)
+        self:SetHeight(SECTION_CONTENT_OFFSET + contentHeight)
+    end
+
+    return section
+end
+
+local function AnchorCheckbox(widget, anchor)
+    widget:SetPoint("TOPLEFT", anchor, "TOPLEFT", 0, 0)
+end
+
+local function AnchorDropdown(widget, anchor)
+    widget:SetPoint("LEFT", anchor, "LEFT", CONTROL_X_OFFSET, 0)
+end
+
+local function CreateRowLabel(parent, anchor, text)
+    local label = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    label:SetPoint("LEFT", anchor, "LEFT", 0, 0)
+    label:SetWidth(LABEL_WIDTH - 8)
+    label:SetText(text)
+    ApplySettingLabelStyle(label)
+    return label
+end
+
+local function AnchorSlider(widget, anchor, width)
+    widget:ClearAllPoints()
+    widget:SetPoint("LEFT", anchor, "LEFT", CONTROL_X_OFFSET, 0)
+    widget:SetWidth(width)
+    if widget.Text then
+        widget.Text:ClearAllPoints()
+        widget.Text:SetPoint("LEFT", anchor, "LEFT", 0, 0)
+        widget.Text:SetWidth(LABEL_WIDTH - 8)
+        ApplySettingLabelStyle(widget.Text)
+    end
+end
+
+local function SetDropdownWidth(dropdown, width)
+    UIDropDownMenu_SetWidth(dropdown, width)
+    UIDropDownMenu_SetButtonWidth(dropdown, math.max(width - 24, 1))
+    UIDropDownMenu_JustifyText(dropdown, "LEFT")
+end
+
+local function ApplyElvUISkin(widgets)
+    if isElvUISkinned then
+        return
+    end
+
+    local S = GetElvUISkinsModule()
+    if not S then
+        return
+    end
+
+    if widgets.checkboxes and S.HandleCheckBox then
+        for _, checkbox in ipairs(widgets.checkboxes) do
+            S:HandleCheckBox(checkbox)
+        end
+    end
+
+    if widgets.sliders then
+        for _, slider in ipairs(widgets.sliders) do
+            if S.HandleSliderFrame then
+                S:HandleSliderFrame(slider)
+            elseif S.HandleSlider then
+                S:HandleSlider(slider)
+            end
+        end
+    end
+
+    if widgets.dropdowns and S.HandleDropDownBox then
+        for _, dropdown in ipairs(widgets.dropdowns) do
+            S:HandleDropDownBox(dropdown, dropdown.width)
+        end
+    end
+
+    if widgets.scrollBar and S.HandleScrollBar then
+        S:HandleScrollBar(widgets.scrollBar)
+    end
+
+    if widgets.editBoxes and S.HandleEditBox then
+        for _, editBox in ipairs(widgets.editBoxes) do
+            S:HandleEditBox(editBox)
+        end
+    end
+
+    if widgets.buttons and S.HandleButton then
+        for _, button in ipairs(widgets.buttons) do
+            S:HandleButton(button)
+        end
+    end
+
+    if widgets.colorPicker and S.HandleButton then
+        S:HandleButton(widgets.colorPicker)
+        widgets.colorPicker:SetSize(24, 24)
+        if widgets.colorPicker.border then
+            widgets.colorPicker.border:Hide()
+        end
+    end
+
+    isElvUISkinned = true
+end
+
 local function CreateOptionsPanel()
     local panel = CreateFrame("Frame", "NewOrderAlertOptionsPanel", UIParent)
     panel.name = ADDON_TITLE
+    panel:SetSize(PANEL_WIDTH, PANEL_HEIGHT)
 
     local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
     title:SetPoint("TOPLEFT", 16, -16)
     title:SetText(ADDON_TITLE)
 
-    local subtitle = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -2)
-    subtitle:SetText(string.format(L["PANEL_SUBTITLE"], "Nathan", VERSION))
+    local scrollFrame = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -12)
+    scrollFrame:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -28, 12)
 
-    local yOffset = -52
+    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
+    scrollChild:SetSize(PANEL_WIDTH, 1)
+    scrollFrame:SetScrollChild(scrollChild)
 
-    local divider1 = panel:CreateTexture(nil, "ARTWORK")
-    divider1:SetColorTexture(0.4, 0.4, 0.4, 0.6)
-    divider1:SetSize(570, 1)
-    divider1:SetPoint("TOPLEFT", 10, yOffset)
-    yOffset = yOffset - 8
+    local widgets = {
+        buttons = {},
+        checkboxes = {},
+        dropdowns = {},
+        editBoxes = {},
+        scrollBar = scrollFrame.ScrollBar,
+        sliders = {},
+    }
 
-    local soundHeader = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    soundHeader:SetPoint("TOPLEFT", 16, yOffset)
-    soundHeader:SetText(L["SECTION_SOUND"])
-    soundHeader:SetTextScale(1.15)
-    yOffset = yOffset - 22
+    local soundSection = CreateSection(scrollChild, L["SECTION_SOUND"])
 
-    local enableSound = CreateCheckbox(panel, L["ENABLE_SOUND"])
-    enableSound:SetPoint("TOPLEFT", 16, yOffset)
+    local soundRow1 = soundSection:AddRow(28)
+    local enableSound = CreateCheckbox(scrollChild, L["ENABLE_SOUND"])
+    AnchorCheckbox(enableSound, soundRow1)
+    table.insert(widgets.checkboxes, enableSound)
 
-    local playInBackground = CreateCheckbox(panel, L["PLAY_IN_BACKGROUND"])
-    playInBackground:SetPoint("TOPLEFT", 250, yOffset)
-    yOffset = yOffset - 40
-
-    local soundDropdown = CreateDropdown(panel, L["SOUND"], 150)
-    soundDropdown:SetPoint("TOPLEFT", 16, yOffset)
-
-    local channelDropdown = CreateDropdown(panel, L["CHANNEL"], 100)
-    channelDropdown:SetPoint("TOPLEFT", 250, yOffset)
-    yOffset = yOffset - 35
-
-    local testButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    testButton:SetSize(140, 24)
-    testButton:SetPoint("TOPLEFT", 16, yOffset)
+    local testButton = CreateFrame("Button", nil, scrollChild, "UIPanelButtonTemplate")
+    testButton:SetSize(INLINE_BUTTON_WIDTH, BUTTON_HEIGHT)
+    testButton:SetPoint("RIGHT", soundRow1, "RIGHT", 0, 0)
     testButton:SetText(L["TEST_NOTIFICATION"])
     testButton:SetEnabled(true)
-    yOffset = yOffset - 32
+    table.insert(widgets.buttons, testButton)
 
-    local divider2 = panel:CreateTexture(nil, "ARTWORK")
-    divider2:SetColorTexture(0.4, 0.4, 0.4, 0.6)
-    divider2:SetSize(570, 1)
-    divider2:SetPoint("TOPLEFT", 10, yOffset)
-    yOffset = yOffset - 8
+    local soundRow2 = soundSection:AddRow(28)
+    local playInBackground = CreateCheckbox(scrollChild, L["PLAY_IN_BACKGROUND"])
+    AnchorCheckbox(playInBackground, soundRow2)
+    table.insert(widgets.checkboxes, playInBackground)
 
-    local displayHeader = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    displayHeader:SetPoint("TOPLEFT", 16, yOffset)
-    displayHeader:SetText(L["SECTION_DISPLAY"])
-    displayHeader:SetTextScale(1.15)
-    yOffset = yOffset - 22
+    local soundRow3 = soundSection:AddRow(32)
+    CreateRowLabel(scrollChild, soundRow3, L["SOUND"])
+    local soundDropdown = CreateDropdown(scrollChild, L["SOUND"], CONTROL_WIDTH)
+    AnchorDropdown(soundDropdown, soundRow3)
+    table.insert(widgets.dropdowns, soundDropdown)
 
-    local enableText = CreateCheckbox(panel, L["ENABLE_TEXT"])
-    enableText:SetPoint("TOPLEFT", 16, yOffset)
+    local soundRow4 = soundSection:AddRow(32)
+    CreateRowLabel(scrollChild, soundRow4, L["CHANNEL"])
+    local channelDropdown = CreateDropdown(scrollChild, L["CHANNEL"], CONTROL_WIDTH)
+    AnchorDropdown(channelDropdown, soundRow4)
+    table.insert(widgets.dropdowns, channelDropdown)
+    soundSection:Finalize()
 
-    local enableChat = CreateCheckbox(panel, L["ENABLE_CHAT"])
-    enableChat:SetPoint("TOPLEFT", 250, yOffset)
-    yOffset = yOffset - 40
+    local displaySection = CreateSection(scrollChild, L["SECTION_DISPLAY"], soundSection)
 
-    local scaleSlider = CreateSlider(panel, L["SCALE"], 0.5, 2.0, 0.1)
-    scaleSlider:SetPoint("TOPLEFT", 16, yOffset)
-    scaleSlider:SetWidth(180)
+    local displayRow1 = displaySection:AddRow(28)
+    local enableText = CreateCheckbox(scrollChild, L["ENABLE_TEXT"])
+    AnchorCheckbox(enableText, displayRow1)
+    table.insert(widgets.checkboxes, enableText)
 
-    local durationSlider = CreateSlider(panel, L["DISPLAY_DURATION"], 2, 10, 1)
-    durationSlider:SetPoint("TOPLEFT", 250, yOffset)
-    durationSlider:SetWidth(180)
-    yOffset = yOffset - 35
+    local testTextButton = CreateFrame("Button", nil, scrollChild, "UIPanelButtonTemplate")
+    testTextButton:SetSize(INLINE_BUTTON_WIDTH, BUTTON_HEIGHT)
+    testTextButton:SetPoint("RIGHT", displayRow1, "RIGHT", 0, 0)
+    testTextButton:SetText(L["TEST_TEXT"])
+    testTextButton:SetEnabled(true)
+    table.insert(widgets.buttons, testTextButton)
 
-    local xOffsetSlider = CreateSlider(panel, L["X_POSITION"], -960, 960, 5)
-    xOffsetSlider:SetPoint("TOPLEFT", 16, yOffset)
-    xOffsetSlider:SetWidth(130)
+    local displayRow2 = displaySection:AddRow(28)
+    local colorPicker = CreateColorPicker(scrollChild, L["FONT_COLOR"])
+    colorPicker:SetPoint("LEFT", displayRow2, "LEFT", CONTROL_X_OFFSET, 0)
+    colorPicker.label:ClearAllPoints()
+    colorPicker.label:SetPoint("LEFT", displayRow2, "LEFT", 0, 0)
+    widgets.colorPicker = colorPicker
 
-    local xOffsetBox = CreateEditBox(panel, 45)
-    xOffsetBox:SetPoint("LEFT", xOffsetSlider, "RIGHT", 8, 0)
-    xOffsetBox:SetMaxLetters(5)
+    local displayRow3 = displaySection:AddRow(32)
+    CreateRowLabel(scrollChild, displayRow3, L["FONT_FACE"])
+    local fontDropdown = CreateDropdown(scrollChild, L["FONT_FACE"], CONTROL_WIDTH)
+    AnchorDropdown(fontDropdown, displayRow3)
+    table.insert(widgets.dropdowns, fontDropdown)
 
-    local yOffsetSlider = CreateSlider(panel, L["Y_POSITION"], -500, 500, 5)
-    yOffsetSlider:SetPoint("TOPLEFT", 250, yOffset)
-    yOffsetSlider:SetWidth(130)
+    local displayRow4 = displaySection:AddRow(32)
+    local scaleSlider = CreateSlider(scrollChild, L["SCALE"], 5, 100, 1)
+    AnchorSlider(scaleSlider, displayRow4, CONTROL_WIDTH)
+    table.insert(widgets.sliders, scaleSlider)
 
-    local yOffsetBox = CreateEditBox(panel, 45)
-    yOffsetBox:SetPoint("LEFT", yOffsetSlider, "RIGHT", 8, 0)
-    yOffsetBox:SetMaxLetters(5)
+    local displayRow5 = displaySection:AddRow(32)
+    local durationSlider = CreateSlider(scrollChild, L["DISPLAY_DURATION"], 2, 10, 1)
+    AnchorSlider(durationSlider, displayRow5, CONTROL_WIDTH)
+    table.insert(widgets.sliders, durationSlider)
 
-    yOffset = yOffset - 35
+    local displayRow6 = displaySection:AddRow(32)
+    local xOffsetSlider = CreateSlider(scrollChild, L["X_POSITION"], -960, 960, 5)
+    AnchorSlider(xOffsetSlider, displayRow6, CONTROL_WIDTH)
+    table.insert(widgets.sliders, xOffsetSlider)
 
-    local colorPicker = CreateColorPicker(panel, L["FONT_COLOR"])
-    colorPicker:SetPoint("TOPLEFT", 16, yOffset)
-    yOffset = yOffset - 30
+    local displayRow7 = displaySection:AddRow(32)
+    local yOffsetSlider = CreateSlider(scrollChild, L["Y_POSITION"], -500, 500, 5)
+    AnchorSlider(yOffsetSlider, displayRow7, CONTROL_WIDTH)
+    table.insert(widgets.sliders, yOffsetSlider)
 
-    local orderLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    orderLabel:SetPoint("TOPLEFT", 16, yOffset)
+    local displayRow8 = displaySection:AddRow(48)
+    local orderLabel = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    orderLabel:SetPoint("LEFT", displayRow8, "LEFT", 0, 0)
+    orderLabel:SetWidth(LABEL_WIDTH - 8)
     orderLabel:SetText(L["NOTIFICATION_MESSAGE"])
-    yOffset = yOffset - 20
+    ApplySettingLabelStyle(orderLabel)
 
-    local orderMessage = CreateEditBox(panel, 360)
-    orderMessage:SetPoint("TOPLEFT", 16, yOffset)
+    local orderMessage = CreateEditBox(scrollChild, 360)
+    orderMessage:SetPoint("LEFT", displayRow8, "LEFT", CONTROL_X_OFFSET, 0)
+    orderMessage:SetSize(CONTENT_WIDTH - CONTROL_X_OFFSET - INLINE_BUTTON_WIDTH - 8, DEFAULT_EDITBOX_HEIGHT)
+    table.insert(widgets.editBoxes, orderMessage)
 
-    local orderSaveButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    orderSaveButton:SetSize(55, 22)
-    orderSaveButton:SetPoint("LEFT", orderMessage, "RIGHT", 6, 0)
+    local orderSaveButton = CreateFrame("Button", nil, scrollChild, "UIPanelButtonTemplate")
+    orderSaveButton:SetSize(INLINE_BUTTON_WIDTH, BUTTON_HEIGHT)
+    orderSaveButton:SetPoint("RIGHT", displayRow8, "RIGHT", 0, 0)
     orderSaveButton:SetText(L["SAVE"])
     orderSaveButton:SetEnabled(true)
+    table.insert(widgets.buttons, orderSaveButton)
+    displaySection:Finalize()
 
-    yOffset = yOffset - 30
+    local suppressSection = CreateSection(scrollChild, L["SECTION_SUPPRESSION"], displaySection)
 
-    local divider3 = panel:CreateTexture(nil, "ARTWORK")
-    divider3:SetColorTexture(0.4, 0.4, 0.4, 0.6)
-    divider3:SetSize(570, 1)
-    divider3:SetPoint("TOPLEFT", 10, yOffset)
-    yOffset = yOffset - 8
+    local suppressRow1 = suppressSection:AddRow(28)
+    local suppressCombat = CreateCheckbox(scrollChild, L["SUPPRESS_COMBAT"])
+    AnchorCheckbox(suppressCombat, suppressRow1)
+    table.insert(widgets.checkboxes, suppressCombat)
 
-    local suppressHeader = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    suppressHeader:SetPoint("TOPLEFT", 16, yOffset)
-    suppressHeader:SetText(L["SECTION_SUPPRESSION"])
-    suppressHeader:SetTextScale(1.15)
-    yOffset = yOffset - 22
+    local suppressRow2 = suppressSection:AddRow(28)
+    local suppressInstance = CreateCheckbox(scrollChild, L["SUPPRESS_INSTANCE"])
+    AnchorCheckbox(suppressInstance, suppressRow2)
+    table.insert(widgets.checkboxes, suppressInstance)
+    suppressSection:Finalize()
 
-    local suppressCombat = CreateCheckbox(panel, L["SUPPRESS_COMBAT"])
-    suppressCombat:SetPoint("TOPLEFT", 16, yOffset)
-    yOffset = yOffset - 24
+    local contentHeight = soundSection:GetHeight()
+        + displaySection:GetHeight()
+        + suppressSection:GetHeight()
+        + (SECTION_SPACING * 2)
+        + 24
+    scrollChild:SetHeight(contentHeight)
 
-    local suppressInstance = CreateCheckbox(panel, L["SUPPRESS_INSTANCE"])
-    suppressInstance:SetPoint("TOPLEFT", 16, yOffset)
+    panel:HookScript("OnShow", function()
+        ApplyElvUISkin(widgets)
+    end)
 
     local function RefreshPanel()
         if not db then
@@ -225,17 +420,23 @@ local function CreateOptionsPanel()
         end
         UIDropDownMenu_SetSelectedValue(channelDropdown, db.soundChannel)
         UIDropDownMenu_SetText(channelDropdown, db.soundChannel)
+        if addon.FONT_OPTIONS then
+            for _, fontOption in ipairs(addon.FONT_OPTIONS) do
+                if fontOption.key == db.fontKey then
+                    UIDropDownMenu_SetSelectedValue(fontDropdown, fontOption.key)
+                    UIDropDownMenu_SetText(fontDropdown, fontOption.label)
+                    break
+                end
+            end
+        end
 
         enableText:SetChecked(db.textEnabled)
-        enableChat:SetChecked(db.chatEnabled)
-        scaleSlider:SetValue(db.textScale)
-        scaleSlider.Text:SetText(string.format(L["SCALE_FORMAT"], db.textScale))
+        scaleSlider:SetValue(db.fontSize)
+        scaleSlider.Text:SetText(string.format(L["SCALE_FORMAT"], db.fontSize))
         xOffsetSlider:SetValue(db.textOffsetX)
         xOffsetSlider.Text:SetText(string.format(L["POSITION_FORMAT"], L["X_POSITION"], db.textOffsetX))
-        xOffsetBox:SetText(tostring(db.textOffsetX))
         yOffsetSlider:SetValue(db.textOffsetY)
         yOffsetSlider.Text:SetText(string.format(L["POSITION_FORMAT"], L["Y_POSITION"], db.textOffsetY))
-        yOffsetBox:SetText(tostring(db.textOffsetY))
         durationSlider:SetValue(db.displayDuration)
         durationSlider.Text:SetText(string.format(L["DISPLAY_DURATION_FORMAT"], db.displayDuration))
 
@@ -251,6 +452,9 @@ local function CreateOptionsPanel()
 
     panel.refresh = RefreshPanel
     panel:SetScript("OnShow", RefreshPanel)
+    panel:HookScript("OnHide", function()
+        addon.HideNotification()
+    end)
 
     enableSound:SetScript("OnClick", function(self)
         db.soundEnabled = self:GetChecked()
@@ -261,18 +465,16 @@ local function CreateOptionsPanel()
             local info = UIDropDownMenu_CreateInfo()
             info.text = soundData.label
             info.value = i
+            info.notCheckable = true
             info.func = function()
                 db.soundIndex = i
                 UIDropDownMenu_SetSelectedValue(soundDropdown, i)
                 UIDropDownMenu_SetText(soundDropdown, soundData.label)
             end
-            info.checked = (db.soundIndex == i)
             UIDropDownMenu_AddButton(info)
         end
     end)
-    UIDropDownMenu_SetWidth(soundDropdown, 150)
-    UIDropDownMenu_SetButtonWidth(soundDropdown, 124)
-    UIDropDownMenu_JustifyText(soundDropdown, "LEFT")
+    SetDropdownWidth(soundDropdown, soundDropdown.width)
 
     UIDropDownMenu_Initialize(channelDropdown, function(self, level)
         local channels = { "Master", "SFX" }
@@ -280,18 +482,33 @@ local function CreateOptionsPanel()
             local info = UIDropDownMenu_CreateInfo()
             info.text = channel
             info.value = channel
+            info.notCheckable = true
             info.func = function()
                 db.soundChannel = channel
                 UIDropDownMenu_SetSelectedValue(channelDropdown, channel)
                 UIDropDownMenu_SetText(channelDropdown, channel)
             end
-            info.checked = (db.soundChannel == channel)
             UIDropDownMenu_AddButton(info)
         end
     end)
-    UIDropDownMenu_SetWidth(channelDropdown, 100)
-    UIDropDownMenu_SetButtonWidth(channelDropdown, 74)
-    UIDropDownMenu_JustifyText(channelDropdown, "LEFT")
+    SetDropdownWidth(channelDropdown, channelDropdown.width)
+
+    UIDropDownMenu_Initialize(fontDropdown, function(self, level)
+        for _, fontOption in ipairs(addon.FONT_OPTIONS or {}) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = fontOption.label
+            info.value = fontOption.key
+            info.notCheckable = true
+            info.func = function()
+                db.fontKey = fontOption.key
+                UIDropDownMenu_SetSelectedValue(fontDropdown, fontOption.key)
+                UIDropDownMenu_SetText(fontDropdown, fontOption.label)
+                addon.UpdateNotificationFrameFont()
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+    SetDropdownWidth(fontDropdown, fontDropdown.width)
 
     playInBackground:SetScript("OnClick", function(self)
         db.playInBackground = self:GetChecked()
@@ -301,61 +518,35 @@ local function CreateOptionsPanel()
     testButton:SetScript("OnClick", function()
         addon.PlayNotificationSound()
         addon.ShowNotification(db.orderMessage)
-        addon.ShowChatNotification(db.orderMessage)
     end)
 
     enableText:SetScript("OnClick", function(self)
         db.textEnabled = self:GetChecked()
+        if not db.textEnabled then
+            addon.HideNotification()
+        end
     end)
 
-    enableChat:SetScript("OnClick", function(self)
-        db.chatEnabled = self:GetChecked()
+    testTextButton:SetScript("OnClick", function()
+        addon.ToggleTestNotification()
     end)
 
     scaleSlider:SetScript("OnValueChanged", function(self, value)
-        db.textScale = value
+        db.fontSize = value
         self.Text:SetText(string.format(L["SCALE_FORMAT"], value))
-        addon.UpdateNotificationFrameScale()
+        addon.UpdateNotificationFrameFont()
     end)
 
     xOffsetSlider:SetScript("OnValueChanged", function(self, value)
         db.textOffsetX = value
         self.Text:SetText(string.format(L["POSITION_FORMAT"], L["X_POSITION"], value))
-        xOffsetBox:SetText(tostring(math.floor(value)))
         addon.UpdateNotificationFramePosition()
-    end)
-
-    xOffsetBox:SetScript("OnEnterPressed", function(self)
-        local value = tonumber(self:GetText()) or 0
-        value = math.max(-960, math.min(960, value))
-        db.textOffsetX = value
-        xOffsetSlider:SetValue(value)
-        self:ClearFocus()
-        addon.UpdateNotificationFramePosition()
-    end)
-    xOffsetBox:SetScript("OnEscapePressed", function(self)
-        self:SetText(tostring(db.textOffsetX))
-        self:ClearFocus()
     end)
 
     yOffsetSlider:SetScript("OnValueChanged", function(self, value)
         db.textOffsetY = value
         self.Text:SetText(string.format(L["POSITION_FORMAT"], L["Y_POSITION"], value))
-        yOffsetBox:SetText(tostring(math.floor(value)))
         addon.UpdateNotificationFramePosition()
-    end)
-
-    yOffsetBox:SetScript("OnEnterPressed", function(self)
-        local value = tonumber(self:GetText()) or 0
-        value = math.max(-500, math.min(500, value))
-        db.textOffsetY = value
-        yOffsetSlider:SetValue(value)
-        self:ClearFocus()
-        addon.UpdateNotificationFramePosition()
-    end)
-    yOffsetBox:SetScript("OnEscapePressed", function(self)
-        self:SetText(tostring(db.textOffsetY))
-        self:ClearFocus()
     end)
 
     durationSlider:SetScript("OnValueChanged", function(self, value)
@@ -415,6 +606,7 @@ local function CreateOptionsPanel()
     Settings.RegisterAddOnCategory(category)
     panel.category = category
 
+    ApplyElvUISkin(widgets)
     RefreshPanel()
     return panel, category
 end
@@ -429,7 +621,6 @@ local function SlashCommandHandler(msg)
     if msg == "test" then
         addon.PlayNotificationSound()
         addon.ShowNotification(db.orderMessage)
-        addon.ShowChatNotification(db.orderMessage)
         print(string.format(L["CHAT_PREFIX"], ADDON_TITLE, L["MSG_TESTING"]))
     elseif addon.settingsCategory then
         Settings.OpenToCategory(addon.settingsCategory:GetID())

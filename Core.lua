@@ -12,13 +12,13 @@ local DEFAULTS = {
     soundChannel = "Master",
     playInBackground = true,
     textEnabled = true,
-    textScale = 1.0,
+    fontSize = 32,
+    fontKey = "Frizqt",
     textColor = { r = 1, g = 1, b = 0 },
     textOffsetX = 0,
     textOffsetY = 200,
     displayDuration = 3,
     orderMessage = L["DEFAULT_ORDER_MESSAGE"],
-    chatEnabled = false,
     suppressInCombat = true,
     suppressInInstance = true,
 }
@@ -26,6 +26,59 @@ local DEFAULTS = {
 local db
 local lastNotificationTime = 0
 local notificationFrame
+local isTestNotificationVisible
+
+local function BuildFontOptions()
+    local options = {}
+    local lookup = {}
+
+    local function AddFont(label, path)
+        if type(label) ~= "string" or label == "" or type(path) ~= "string" or path == "" or lookup[label] then
+            return
+        end
+
+        local option = {
+            key = label,
+            label = label,
+            path = path,
+        }
+        table.insert(options, option)
+        lookup[label] = option
+    end
+
+    AddFont("Friz Quadrata", "Fonts\\FRIZQT__.TTF")
+    AddFont("Arial Narrow", "Fonts\\ARIALN.TTF")
+    AddFont("Morpheus", "Fonts\\MORPHEUS.TTF")
+    AddFont("Skurri", "Fonts\\skurri.ttf")
+
+    local LSM = _G.LibStub and _G.LibStub("LibSharedMedia-3.0", true)
+    if LSM and LSM.HashTable then
+        local fonts = LSM:HashTable("font")
+        for name, path in pairs(fonts or {}) do
+            AddFont(name, path)
+        end
+    end
+
+    local E = _G.ElvUI and unpack(_G.ElvUI)
+    if E and E.media then
+        AddFont("ElvUI Normal", E.media.normFont)
+        AddFont("ElvUI Combat", E.media.combatFont)
+    end
+
+    table.sort(options, function(a, b)
+        return a.label < b.label
+    end)
+
+    addon.FONT_OPTIONS = options
+    addon.FONT_LOOKUP = lookup
+end
+
+local function GetNotificationFont()
+    local _, _, fontFlags = GameFontNormalLarge:GetFont()
+    local selectedPath = addon.FONT_LOOKUP and addon.FONT_LOOKUP[db.fontKey] and addon.FONT_LOOKUP[db.fontKey].path
+
+    return selectedPath or "Fonts\\FRIZQT__.TTF", fontFlags
+end
 
 local function MessageContainsAll(message, parts)
     if type(message) ~= "string" or type(parts) ~= "table" then
@@ -96,6 +149,7 @@ local function ShowNotification(message)
         return
     end
 
+    isTestNotificationVisible = false
     frame.text:SetText(message)
     UIFrameFadeRemoveFrame(frame)
     frame:Show()
@@ -103,19 +157,50 @@ local function ShowNotification(message)
 
     local holdTime = math.max(db.displayDuration - 1.0, 1.0)
     C_Timer.After(0.5 + holdTime, function()
+        if isTestNotificationVisible then
+            return
+        end
+
         UIFrameFadeOut(frame, 0.5, 1, 0)
         C_Timer.After(0.5, function()
+            if isTestNotificationVisible then
+                return
+            end
             frame:Hide()
         end)
     end)
 end
 
-local function ShowChatNotification(message)
-    if not db.chatEnabled then
+local function HideNotification()
+    if not notificationFrame then
         return
     end
 
-    print(string.format(L["CHAT_PREFIX"], ADDON_TITLE, message))
+    isTestNotificationVisible = false
+    UIFrameFadeRemoveFrame(notificationFrame)
+    notificationFrame:Hide()
+end
+
+local function ShowTestNotification()
+    if not db.textEnabled or not notificationFrame then
+        return
+    end
+
+    isTestNotificationVisible = true
+    notificationFrame.text:SetText(db.orderMessage)
+    UIFrameFadeRemoveFrame(notificationFrame)
+    notificationFrame:SetAlpha(1)
+    notificationFrame:Show()
+end
+
+local function ToggleTestNotification()
+    if isTestNotificationVisible then
+        HideNotification()
+        return false
+    end
+
+    ShowTestNotification()
+    return true
 end
 
 local function CreateNotificationFrame()
@@ -142,9 +227,10 @@ local function UpdateNotificationFramePosition()
     notificationFrame:SetPoint("CENTER", UIParent, "CENTER", db.textOffsetX, db.textOffsetY)
 end
 
-local function UpdateNotificationFrameScale()
+local function UpdateNotificationFrameFont()
     if notificationFrame and notificationFrame.text then
-        notificationFrame.text:SetScale(db.textScale)
+        local fontName, fontFlags = GetNotificationFont()
+        notificationFrame.text:SetFont(fontName, db.fontSize, fontFlags)
     end
 end
 
@@ -178,7 +264,6 @@ local function OnSystemMessage(self, event, message, ...)
 
     PlayNotificationSound()
     ShowNotification(db.orderMessage)
-    ShowChatNotification(db.orderMessage)
 end
 
 local function OnLogin()
@@ -194,6 +279,16 @@ local function OnLogin()
         db.orderMessage = db.personalMessage
     end
     db.personalMessage = nil
+
+    if db.fontSize == nil and db.textScale ~= nil then
+        db.fontSize = math.max(5, math.min(100, math.floor((db.textScale * 32) + 0.5)))
+    end
+    db.textScale = nil
+    db.chatEnabled = nil
+    if db.fontKey == "Frizqt" then db.fontKey = "Friz Quadrata" end
+    if db.fontKey == "Arial" then db.fontKey = "Arial Narrow" end
+    if db.fontKey == "Morpheus" then db.fontKey = "Morpheus" end
+    if db.fontKey == "Skurri" then db.fontKey = "Skurri" end
 
     for key, value in pairs(DEFAULTS) do
         if db[key] == nil then
@@ -218,15 +313,23 @@ local function OnLogin()
         db.originalBGSoundCVar = GetCVar("Sound_EnableSoundWhenGameIsInBG")
     end
 
+    BuildFontOptions()
+    if not (addon.FONT_LOOKUP and addon.FONT_LOOKUP[db.fontKey]) then
+        db.fontKey = DEFAULTS.fontKey
+    end
+
     ApplyBackgroundSoundSetting()
     notificationFrame = CreateNotificationFrame()
+    UpdateNotificationFrameFont()
 
     addon.db = db
+    addon.HideNotification = HideNotification
     addon.PlayNotificationSound = PlayNotificationSound
     addon.ShowNotification = ShowNotification
-    addon.ShowChatNotification = ShowChatNotification
+    addon.ShowTestNotification = ShowTestNotification
+    addon.ToggleTestNotification = ToggleTestNotification
     addon.UpdateNotificationFramePosition = UpdateNotificationFramePosition
-    addon.UpdateNotificationFrameScale = UpdateNotificationFrameScale
+    addon.UpdateNotificationFrameFont = UpdateNotificationFrameFont
     addon.UpdateNotificationFrameColor = UpdateNotificationFrameColor
     addon.ApplyBackgroundSoundSetting = ApplyBackgroundSoundSetting
     addon.IsPersonalOrderMessage = IsPersonalOrderMessage
