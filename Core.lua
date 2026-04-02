@@ -8,13 +8,13 @@ local THROTTLE_SECONDS = 3
 
 local DEFAULTS = {
     soundEnabled = true,
-    soundIndex = 1,
+    soundIndex = 3,
     soundChannel = "Master",
     playInBackground = true,
     textEnabled = true,
-    fontSize = 30,
+    fontSize = 35,
     fontKey = "Friz Quadrata",
-    textColor = { r = 1, g = 1, b = 0 },
+    textColor = { r = 0.53, g = 0.81, b = 0.92 },
     textOffsetX = 0,
     textOffsetY = 300,
     displayDuration = 2,

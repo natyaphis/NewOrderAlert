@@ -5,6 +5,7 @@ local VERSION = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMeta
 
 local db
 local isElvUISkinned
+local optionsPanel
 
 local PANEL_WIDTH = 620
 local CONTENT_WIDTH = 588
@@ -195,6 +196,13 @@ local function SetDropdownWidth(dropdown, width)
     UIDropDownMenu_SetButtonWidth(dropdown, math.max(width - 24, 1))
     UIDropDownMenu_JustifyText(dropdown, "LEFT")
 
+    local button = dropdown.Button or _G[dropdown:GetName() and (dropdown:GetName() .. "Button") or ""]
+    if button then
+        button:SetScript("OnClick", function()
+            ToggleDropDownMenu(1, nil, dropdown)
+        end)
+    end
+
     local text = dropdown.Text or _G[dropdown:GetName() and (dropdown:GetName() .. "Text") or ""]
     if text then
         text:ClearAllPoints()
@@ -238,7 +246,8 @@ local function BindDropdown(dropdown, items, getValue, setValue)
             end
             UIDropDownMenu_AddButton(info)
 
-            local listFrame = _G["DropDownList" .. level]
+            local menuLevel = level or UIDROPDOWNMENU_MENU_LEVEL or 1
+            local listFrame = _G["DropDownList" .. menuLevel]
             local button = listFrame and _G[listFrame:GetName() .. "Button" .. listFrame.numButtons]
             local buttonText = button and button.NormalText
             if buttonText then
@@ -410,6 +419,10 @@ local function ApplyElvUISkin(widgets)
 end
 
 local function CreateOptionsPanel()
+    if optionsPanel and optionsPanel.category then
+        return optionsPanel, optionsPanel.category
+    end
+
     local panel = CreateFrame("Frame", "NewOrderAlertOptionsPanel", UIParent)
     panel.name = ADDON_TITLE
     panel:SetSize(PANEL_WIDTH, PANEL_HEIGHT)
@@ -743,10 +756,34 @@ local function CreateOptionsPanel()
     local category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
     Settings.RegisterAddOnCategory(category)
     panel.category = category
+    optionsPanel = panel
 
     ApplyElvUISkin(widgets)
     RefreshPanel()
     return panel, category
+end
+
+local function EnsureSettingsCategory()
+    if addon.settingsCategory and optionsPanel then
+        if optionsPanel.refresh then
+            optionsPanel.refresh()
+        end
+        return addon.settingsCategory
+    end
+
+    if not db then
+        db = addon.db
+    end
+    if not db then
+        return nil
+    end
+
+    local panel, category = CreateOptionsPanel()
+    addon.settingsCategory = category
+    if panel and panel.refresh then
+        panel.refresh()
+    end
+    return category
 end
 
 local function SlashCommandHandler(msg)
@@ -754,14 +791,18 @@ local function SlashCommandHandler(msg)
         db = addon.db
     end
 
-    msg = strtrim(msg:lower())
+    msg = strtrim((msg or ""):lower())
 
     if msg == "test" then
         addon.PlayNotificationSound()
         addon.ShowNotification(db.orderMessage)
         print(string.format(L["CHAT_PREFIX"], ADDON_TITLE, L["MSG_TESTING"]))
-    elseif addon.settingsCategory then
-        Settings.OpenToCategory(addon.settingsCategory:GetID())
+    else
+        local category = EnsureSettingsCategory()
+        if category then
+            Settings.OpenToCategory(category:GetID())
+            Settings.OpenToCategory(category:GetID())
+        end
     end
 end
 
@@ -773,6 +814,4 @@ local initFrame = CreateFrame("Frame")
 initFrame:RegisterEvent("PLAYER_LOGIN")
 initFrame:SetScript("OnEvent", function()
     db = addon.db
-    local panel, category = CreateOptionsPanel()
-    addon.settingsCategory = category
 end)
