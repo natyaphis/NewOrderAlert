@@ -1,0 +1,35 @@
+NewOrderAlert To-Do
+
+1. Chat Keyword Alert
+- Add chat message monitoring beyond CHAT_MSG_SYSTEM.
+- Support user-defined keywords on the settings page.
+- Support a custom alert message shown when a keyword is detected.
+- Reuse the existing sound and on-screen text notification pipeline.
+- Add separate saved settings for:
+  chatKeywordEnabled
+  chatKeywordList
+  chatAlertMessage
+  optional channel filters
+- Recommended first version:
+  monitor Whisper, Battle.net Whisper, Guild, Party, and Raid
+  match when any keyword is contained in the message
+  case-insensitive matching
+  use a separate throttle from order alerts
+
+2. Quick Whisper Preset
+- Add a one-click whisper feature for a selected player.
+- When triggered, open a whisper to that player and auto-fill a preset message.
+- Add settings for:
+  quickWhisperEnabled
+  quickWhisperMessage
+  optional auto-send toggle
+- Recommended first version:
+  auto-fill only, do not auto-send
+  prefer a right-click player menu entry such as "Send Preset Whisper"
+  optional slash-command fallback for manual testing
+
+Files likely to change:
+- NewOrderAlert.lua
+- Config.lua
+- Locales/zhCN.lua
+- Locales/enUS.lua

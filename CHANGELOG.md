@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+- Maintenance update.
+
 ## 1.1.2
 
 - Updated localization text across supported locales.
@@ -39,11 +43,6 @@ All notable changes to this project will be documented in this file.
 
 - Updated localization text across supported locales.
 - Updated addon version metadata.
-
-## Unreleased
-
-- Added `Localization` files for English and Simplified Chinese, and moved addon text to localized string lookups.
-- Added an `All rights reserved` license file.
 
 ## 1.0.2
 
