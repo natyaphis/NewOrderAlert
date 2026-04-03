@@ -5,6 +5,7 @@ local SAVED_VARIABLES_NAME = "NewOrderAlertDB"
 local VERSION = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addonName, "Version") or "unknown"
 
 local THROTTLE_SECONDS = 3
+local issecretvalue = issecretvalue
 
 -- SoundKit IDs use PlaySound; fileDataIDs use PlaySoundFile.
 addon.SOUND_LIST = {
@@ -148,8 +149,12 @@ local function MessageContainsAll(message, parts)
         return false
     end
 
+    if issecretvalue and issecretvalue(message) then
+        return false
+    end
+
     for _, part in ipairs(parts) do
-        if not message:find(part, 1, true) then
+        if not string.find(message, part, 1, true) then
             return false
         end
     end
