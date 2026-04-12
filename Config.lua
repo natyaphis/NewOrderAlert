@@ -291,6 +291,34 @@ local function CreateCheckboxRow(section, widgets, options)
     }
 end
 
+local function CreateDualCheckboxRow(section, widgets, leftOptions, rightOptions)
+    local row = section:AddRow(28)
+    local columnWidth = math.floor((CONTENT_WIDTH - 16) / 2)
+
+    local leftCheckbox = CreateCheckbox(row, leftOptions.label)
+    leftCheckbox:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+    leftCheckbox.Text:SetWidth(columnWidth - 28)
+    leftCheckbox.Text:SetJustifyH("LEFT")
+    leftCheckbox:SetScript("OnClick", leftOptions.onClick)
+    table.insert(widgets.checkboxes, leftCheckbox)
+
+    local rightCheckbox
+    if rightOptions then
+        rightCheckbox = CreateCheckbox(row, rightOptions.label)
+        rightCheckbox:SetPoint("TOPLEFT", row, "TOPLEFT", columnWidth, 0)
+        rightCheckbox.Text:SetWidth(columnWidth - 28)
+        rightCheckbox.Text:SetJustifyH("LEFT")
+        rightCheckbox:SetScript("OnClick", rightOptions.onClick)
+        table.insert(widgets.checkboxes, rightCheckbox)
+    end
+
+    return {
+        row = row,
+        leftCheckbox = leftCheckbox,
+        rightCheckbox = rightCheckbox,
+    }
+end
+
 local function CreateDropdownRow(section, widgets, label, width)
     local row = section:AddRow(32)
     CreateRowLabel(row, row, label)
@@ -447,7 +475,43 @@ local function CreateOptionsPanel()
     local controls = {}
     local sections = {}
 
-    sections.sound = CreateSection(scrollChild)
+    sections.suppression = CreateSection(scrollChild)
+    controls.suppressCombat = CreateDualCheckboxRow(sections.suppression, widgets, {
+        label = L["SUPPRESS_COMBAT"],
+        onClick = function(self)
+            db.suppressInCombat = self:GetChecked()
+        end,
+    }, {
+        label = L["SUPPRESS_ARENA"],
+        onClick = function(self)
+            db.suppressInArena = self:GetChecked()
+        end,
+    })
+    controls.suppressMythicPlus = CreateDualCheckboxRow(sections.suppression, widgets, {
+        label = L["SUPPRESS_MYTHIC_PLUS"],
+        onClick = function(self)
+            db.suppressInMythicPlus = self:GetChecked()
+        end,
+    }, {
+        label = L["SUPPRESS_BATTLEGROUND"],
+        onClick = function(self)
+            db.suppressInBattleground = self:GetChecked()
+        end,
+    })
+    controls.suppressRaid = CreateDualCheckboxRow(sections.suppression, widgets, {
+        label = L["SUPPRESS_RAID"],
+        onClick = function(self)
+            db.suppressInRaid = self:GetChecked()
+        end,
+    }, {
+        label = L["REST_AREA_ONLY"],
+        onClick = function(self)
+            db.restAreaOnly = self:GetChecked()
+        end,
+    })
+    sections.suppression:Finalize()
+
+    sections.sound = CreateSection(scrollChild, sections.suppression)
     controls.enableSound = CreateCheckboxRow(sections.sound, widgets, {
         label = L["ENABLE_SOUND"],
         onClick = function(self)
@@ -494,48 +558,9 @@ local function CreateOptionsPanel()
     controls.message = CreateMessageRow(sections.display, widgets)
     sections.display:Finalize()
 
-    sections.suppression = CreateSection(scrollChild, sections.display)
-    controls.suppressCombat = CreateCheckboxRow(sections.suppression, widgets, {
-        label = L["SUPPRESS_COMBAT"],
-        onClick = function(self)
-            db.suppressInCombat = self:GetChecked()
-        end,
-    })
-    controls.suppressMythicPlus = CreateCheckboxRow(sections.suppression, widgets, {
-        label = L["SUPPRESS_MYTHIC_PLUS"],
-        onClick = function(self)
-            db.suppressInMythicPlus = self:GetChecked()
-        end,
-    })
-    controls.suppressRaid = CreateCheckboxRow(sections.suppression, widgets, {
-        label = L["SUPPRESS_RAID"],
-        onClick = function(self)
-            db.suppressInRaid = self:GetChecked()
-        end,
-    })
-    controls.suppressArena = CreateCheckboxRow(sections.suppression, widgets, {
-        label = L["SUPPRESS_ARENA"],
-        onClick = function(self)
-            db.suppressInArena = self:GetChecked()
-        end,
-    })
-    controls.suppressBattleground = CreateCheckboxRow(sections.suppression, widgets, {
-        label = L["SUPPRESS_BATTLEGROUND"],
-        onClick = function(self)
-            db.suppressInBattleground = self:GetChecked()
-        end,
-    })
-    controls.restAreaOnly = CreateCheckboxRow(sections.suppression, widgets, {
-        label = L["REST_AREA_ONLY"],
-        onClick = function(self)
-            db.restAreaOnly = self:GetChecked()
-        end,
-    })
-    sections.suppression:Finalize()
-
-    local contentHeight = sections.sound:GetHeight()
+    local contentHeight = sections.suppression:GetHeight()
+        + sections.sound:GetHeight()
         + sections.display:GetHeight()
-        + sections.suppression:GetHeight()
         + (SECTION_SPACING * 2)
         + 24
     scrollChild:SetHeight(contentHeight)
@@ -723,12 +748,12 @@ local function CreateOptionsPanel()
         controls.enableSound.checkbox:SetChecked(db.soundEnabled)
         controls.playInBackground.checkbox:SetChecked(db.playInBackground)
         controls.enableText.checkbox:SetChecked(db.textEnabled)
-        controls.suppressCombat.checkbox:SetChecked(db.suppressInCombat)
-        controls.suppressMythicPlus.checkbox:SetChecked(db.suppressInMythicPlus)
-        controls.suppressRaid.checkbox:SetChecked(db.suppressInRaid)
-        controls.suppressArena.checkbox:SetChecked(db.suppressInArena)
-        controls.suppressBattleground.checkbox:SetChecked(db.suppressInBattleground)
-        controls.restAreaOnly.checkbox:SetChecked(db.restAreaOnly)
+        controls.suppressCombat.leftCheckbox:SetChecked(db.suppressInCombat)
+        controls.suppressMythicPlus.leftCheckbox:SetChecked(db.suppressInMythicPlus)
+        controls.suppressRaid.leftCheckbox:SetChecked(db.suppressInRaid)
+        controls.suppressCombat.rightCheckbox:SetChecked(db.suppressInArena)
+        controls.suppressMythicPlus.rightCheckbox:SetChecked(db.suppressInBattleground)
+        controls.suppressRaid.rightCheckbox:SetChecked(db.restAreaOnly)
 
         BindAllDropdowns()
 
@@ -810,4 +835,5 @@ local initFrame = CreateFrame("Frame")
 initFrame:RegisterEvent("PLAYER_LOGIN")
 initFrame:SetScript("OnEvent", function()
     db = addon.db
+    EnsureSettingsCategory()
 end)
