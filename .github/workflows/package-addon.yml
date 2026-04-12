@@ -1,0 +1,51 @@
+name: Package Addon
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare package folder
+        run: |
+          set -euo pipefail
+          rm -rf package
+          mkdir -p package/NewOrderAlert
+
+          rsync -av --delete \
+            --exclude ".git/" \
+            --exclude ".github/" \
+            --exclude ".vscode/" \
+            --exclude ".idea/" \
+            --exclude ".gitignore" \
+            --exclude ".gitattributes" \
+            --exclude "package/" \
+            --exclude "CHANGELOG.md" \
+            --exclude "AGENTS.md" \
+            --exclude "scripts/" \
+            --exclude "Asset/" \
+            ./ package/NewOrderAlert/
+
+          echo "Package content:"
+          find package/NewOrderAlert -maxdepth 2 -print
+
+      - name: Create zip
+        run: |
+          set -euo pipefail
+          cd package
+          ZIP_NAME="../NewOrderAlert-${{ github.event.release.tag_name }}.zip"
+          zip -r "$ZIP_NAME" NewOrderAlert
+
+      - name: Upload zip to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: NewOrderAlert-${{ github.event.release.tag_name }}.zip
